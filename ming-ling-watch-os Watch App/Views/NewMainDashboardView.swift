@@ -10,6 +10,9 @@ struct NewMainDashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // 宠物动画区域
+                petAnimationSection
+                
                 // 问候语区域
                 greetingSection
                 
@@ -21,13 +24,34 @@ struct NewMainDashboardView: View {
             }
             .padding(.horizontal)
         }
-        .navigationTitle("Health Assistant")
+        .navigationTitle("健康助手")
         .onAppear {
             healthKitManager.requestAuthorization()
             profileManager.updateHealthStreak()
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
+        }
+    }
+    
+    // MARK: - 宠物动画区域
+    private var petAnimationSection: some View {
+        VStack(spacing: 8) {
+            Text("我的宠物")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            PetAnimationView(userElement: profileManager.userProfile.fiveElements?.primary ?? "金")
+                .frame(height: 120)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(profileManager.getThemeColor().opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(profileManager.getThemeColor().opacity(0.3), lineWidth: 1)
+                        )
+                )
         }
     }
     

@@ -114,11 +114,18 @@ class HealthMonitoringService: ObservableObject {
         }
     }
     
-    // MARK: - 检查久坐状态
+        // MARK: - 检查久坐状态
     private func checkSedentaryStatus(userElement: String) async {
-        let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
+        // 检查时间：晚上10点到早上6点不提醒久坐
         let calendar = Calendar.current
         let now = Date()
+        let hour = calendar.component(.hour, from: now)
+        
+        if hour >= 22 || hour < 6 {
+            return // 晚上不提醒久坐
+        }
+        
+        let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
         let oneHourAgo = calendar.date(byAdding: .hour, value: -1, to: now)!
         
         let predicate = HKQuery.predicateForSamples(withStart: oneHourAgo, end: now, options: .strictStartDate)
@@ -129,16 +136,16 @@ class HealthMonitoringService: ObservableObject {
                 
                 let steps = sum.doubleValue(for: HKUnit.count())
                 
-                                 if steps < 40 {
-                     let reminder = HealthReminder.allReminders.first { $0.type == .sedentary }
-                     let message = reminder?.getReminder(for: userElement) ?? "Time to move around!"
-                     
-                     self.notificationManager.sendHealthReminder(
-                         type: .sedentary,
-                         message: message,
-                         userElement: userElement
-                     )
-                 }
+                if steps < 40 {
+                    let reminder = HealthReminder.allReminders.first { $0.type == .sedentary }
+                    let message = reminder?.getReminder(for: userElement) ?? "Time to move around!"
+                    
+                    self.notificationManager.sendHealthReminder(
+                        type: .sedentary,
+                        message: message,
+                        userElement: userElement
+                    )
+                }
             }
             
             healthStore.execute(query)
@@ -147,11 +154,18 @@ class HealthMonitoringService: ObservableObject {
         }
     }
     
-    // MARK: - 检查运动状态
+        // MARK: - 检查运动状态
     private func checkExerciseStatus(userElement: String) async {
-        let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
+        // 检查时间：晚上9点到早上6点不提醒运动
         let calendar = Calendar.current
         let now = Date()
+        let hour = calendar.component(.hour, from: now)
+        
+        if hour >= 21 || hour < 6 {
+            return // 晚上不提醒运动
+        }
+        
+        let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
         let tenMinutesAgo = calendar.date(byAdding: .minute, value: -10, to: now)!
         
         let predicate = HKQuery.predicateForSamples(withStart: tenMinutesAgo, end: now, options: .strictStartDate)
@@ -164,18 +178,18 @@ class HealthMonitoringService: ObservableObject {
                     sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute())) > 120
                 }
                 
-                                 if highHeartRateSamples.count >= 5 { // 如果超过5个样本心率都高于120
-                     let reminder = HealthReminder.allReminders.first { $0.type == .exercise }
-                     let message = reminder?.getReminder(for: userElement) ?? "Great workout! Remember to rest."
-                     
-                     // 运动后15分钟提醒
-                     self.notificationManager.scheduleTimedReminder(
-                         type: .exercise,
-                         message: message,
-                         userElement: userElement,
-                         delay: 900 // 15分钟
-                     )
-                 }
+                if highHeartRateSamples.count >= 5 { // 如果超过5个样本心率都高于120
+                    let reminder = HealthReminder.allReminders.first { $0.type == .exercise }
+                    let message = reminder?.getReminder(for: userElement) ?? "Great workout! Remember to rest."
+                    
+                    // 运动后15分钟提醒
+                    self.notificationManager.scheduleTimedReminder(
+                        type: .exercise,
+                        message: message,
+                        userElement: userElement,
+                        delay: 900 // 15分钟
+                    )
+                }
             }
             
             healthStore.execute(query)
@@ -203,18 +217,20 @@ class HealthMonitoringService: ObservableObject {
                     total + sample.endDate.timeIntervalSince(sample.startDate)
                 }
                 
-                let sleepHours = totalSleepTime / 3600
+                                let sleepHours = totalSleepTime / 3600
                 
-                                 if sleepHours < 7 {
-                     let reminder = HealthReminder.allReminders.first { $0.type == .sleep }
-                     let message = reminder?.getReminder(for: userElement) ?? "You need more sleep tonight."
-                     
-                     self.notificationManager.sendHealthReminder(
-                         type: .sleep,
-                         message: message,
-                         userElement: userElement
-                     )
-                 }
+                // 只在早上6-10点检查睡眠状态（用户醒来后）
+                let hour = calendar.component(.hour, from: now)
+                if hour >= 6 && hour <= 10 && sleepHours < 7 {
+                    let reminder = HealthReminder.allReminders.first { $0.type == .sleep }
+                    let message = reminder?.getReminder(for: userElement) ?? "You need more sleep tonight."
+                    
+                    self.notificationManager.sendHealthReminder(
+                        type: .sleep,
+                        message: message,
+                        userElement: userElement
+                    )
+                }
             }
             
             healthStore.execute(query)
@@ -225,6 +241,15 @@ class HealthMonitoringService: ObservableObject {
     
         // MARK: - 检查晒太阳状态
     private func checkSunExposure(userElement: String) async {
+        // 检查时间：晚上6点到早上8点不提醒晒太阳
+        let calendar = Calendar.current
+        let now = Date()
+        let hour = calendar.component(.hour, from: now)
+        
+        if hour >= 18 || hour < 8 {
+            return // 晚上不提醒晒太阳
+        }
+        
         // 使用环境传感器管理器检查晒太阳条件
         if environmentManager.isGoodTimeForSunExposure() && environmentManager.checkIndoorToOutdoorTransition() {
             let reminder = HealthReminder.allReminders.first { $0.type == .sunExposure }
