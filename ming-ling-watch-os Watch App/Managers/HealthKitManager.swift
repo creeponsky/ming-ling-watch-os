@@ -26,7 +26,7 @@ class HealthKitManager: ObservableObject {
     @Published var bloodOxygen: Double = 0
     @Published var bodyTemperature: Double = 0
     @Published var respiratoryRate: Double = 0
-    @Published var sleepAnalysis: String = "Not Available"
+    @Published var sleepAnalysis: String = "暂无数据"
     
     private var heartRateQuery: HKQuery?
     private var activeEnergyQuery: HKQuery?
