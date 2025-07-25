@@ -8,6 +8,7 @@ struct HealthDashboardPageView: View {
     @StateObject private var environmentManager = EnvironmentSensorManager.shared
     @StateObject private var systemNotificationManager = SystemNotificationManager.shared
     @StateObject private var gifAnimationManager = GIFAnimationManager.shared
+    @StateObject private var demoManager = DemoManager.shared
     
     @State private var isDelayedNotification: Bool = false
     
@@ -22,6 +23,9 @@ struct HealthDashboardPageView: View {
                 
                 // 通知测试模块
                 notificationTestSection
+                
+                // Demo模块
+                demoSection
                 
                 // 设置入口
                 settingsSection
@@ -88,7 +92,7 @@ struct HealthDashboardPageView: View {
     // MARK: - 健康卡片区域
     private var healthCardsSection: some View {
         VStack(spacing: 16) {
-            Text("今日健康监测")
+            Text("今日健康监测11")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -212,6 +216,91 @@ struct HealthDashboardPageView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
                                     .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+    }
+    
+    // MARK: - Demo模块
+    private var demoSection: some View {
+        VStack(spacing: 16) {
+            Text("Demo体验")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+            
+            VStack(spacing: 12) {
+                // Demo状态显示
+                if demoManager.isDemo {
+                    HStack {
+                        Image(systemName: "play.circle.fill")
+                            .foregroundColor(.green)
+                        
+                        VStack(alignment: .leading) {
+                            Text("Demo进行中")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            
+                            Text(demoManager.stateDescription)
+                                .font(.caption2)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                        }
+                        
+                        Spacer()
+                        
+                        if demoManager.canExitDemo {
+                            Button("退出") {
+                                demoManager.exitDemo()
+                            }
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+                
+                // Demo按钮
+                Button(action: {
+                    if demoManager.isDemo {
+                        demoManager.resetDemo()
+                    } else {
+                        demoManager.startDemo()
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: demoManager.isDemo ? "arrow.clockwise" : "play.fill")
+                            .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            .font(.title2)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(demoManager.isDemo ? "重置Demo" : "开始Demo")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            
+                            Text(demoManager.isDemo ? "重新开始Demo流程" : "体验完整功能演示")
+                                .font(.caption)
+                                .foregroundColor(demoManager.isDemo ? PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7) : .white.opacity(0.9))
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                            .font(.caption)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.blue.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
                             )
                     )
                 }
