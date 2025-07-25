@@ -57,12 +57,13 @@ struct PetNotificationLongLookView: View {
     let notificationUserInfo: [String: Any]
     
     var body: some View {
+        // 主容器 - 只包含背景和对话框
         ZStack {
             // 背景色
             PetUtils.getElementBackgroundColor(for: userElement)
                 .ignoresSafeArea()
             
-            // 对话框card - 固定大小，不受其他元素影响
+            // 对话框
             VStack(alignment: .leading, spacing: 6) {
                 Text(getNotificationMessage())
                     .font(.system(size: 14, weight: .medium))
@@ -73,7 +74,7 @@ struct PetNotificationLongLookView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .frame(width: 112, height: 80, alignment: .leading) // 缩小宽度到70%：160 * 0.7 = 112
+            .frame(width: 112, height: 80, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.95))
@@ -83,42 +84,45 @@ struct PetNotificationLongLookView: View {
                     )
             )
             .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
-            .position(x: 70, y: 50) // 更靠左上角
-            
-            // 亲密度显示 - 绝对定位在对话框右下角
-            if isCompletionNotification() {
-                HStack(spacing: 4) {
-                    Image(systemName: getIntimacyIcon())
-                        .font(.caption2)
-                        .foregroundColor(Color(hex: profileManager.userProfile.intimacyGradeColor))
-                    
-                    Text("+\(getIntimacyPoints())")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(PetUtils.getElementTextColor(for: userElement))
+            .position(x: 70, y: 50)
+        }
+        .frame(width: 200, height: 240)
+        // 使用overlay添加其他元素，实现真正的绝对定位
+        .overlay(
+            // 亲密度显示
+            Group {
+                if isCompletionNotification() {
+                    HStack(spacing: 4) {
+                        Image(systemName: getIntimacyIcon())
+                            .font(.caption2)
+                            .foregroundColor(Color(hex: profileManager.userProfile.intimacyGradeColor))
+                        
+                        Text("+\(getIntimacyPoints())")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundColor(PetUtils.getElementTextColor(for: userElement))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 3)
+                    .position(x: 110, y: 75)
                 }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.8))
-                )
-                .position(x: 110, y: 75) // 调整到新的对话框右下角
             }
-            
-            // GIF动画层 - 使用绝对定位，不影响其他元素
+        )
+        .overlay(
+            // GIF动画层
             Group {
                 if let useGIFAnimation = notificationUserInfo["useGIFAnimation"] as? Bool, useGIFAnimation {
                     GIFAnimationView(gifName: getGIFName(), isPlaying: true)
-                        .frame(width: 240, height: 240) // 1.5倍：160 * 1.5 = 240
+                        .frame(width: 240, height: 240)
+                        .clipped()
                 } else {
                     Image(PetUtils.getPetSpeakImageName(for: userElement))
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 160, height: 160) // speak保持原大小
+                        .frame(width: 160, height: 160)
                 }
             }
-            .position(x: 140, y: 140) // 往下移动：120 -> 140
-        }
+            .position(x: 140, y: 160)
+        )
         .onAppear {
             loadNotificationContent()
         }
