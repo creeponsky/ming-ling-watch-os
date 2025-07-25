@@ -15,7 +15,7 @@ class HealthMonitoringService: ObservableObject {
     private let healthKitManager = HealthKitManager()
     private let motionManager = MotionManager()
     private let locationManager = LocationManager()
-    private let notificationManager = NotificationManager.shared
+    private let systemNotificationManager = SystemNotificationManager.shared
     private let profileManager = UserProfileManager.shared
     
     // 久坐检测相关
@@ -92,18 +92,11 @@ class HealthMonitoringService: ObservableObject {
             sedentaryReminderTime = Date()
             stepsBeforeReminder = hourlySteps
             
-            // 发送久坐提醒
+            // 发送久坐建议通知
             let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
-            let message = ReminderContentManager.shared.getReminderContent(
-                for: "久坐",
-                subType: "建议",
-                element: userElement
-            )
-            
-            notificationManager.sendHealthReminder(
-                type: .sedentary,
-                message: message,
-                userElement: userElement
+            systemNotificationManager.sendSuggestionNotification(
+                for: userElement,
+                taskType: .sedentary
             )
             
             // 开始后续检测
@@ -113,53 +106,47 @@ class HealthMonitoringService: ObservableObject {
     
     // MARK: - 开始久坐后续监测
     private func startSedentaryFollowUpMonitoring() {
-        isMonitoringFollowUp = true
-        
-        // 10分钟后检查是否开始活动
+        // 10分钟后检查步数变化
         followUpTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: false) { [weak self] _ in
-            self?.checkSedentaryFollowUp()
+            self?.checkSedentaryFollowUp(0)
         }
     }
     
     // MARK: - 检查久坐后续
-    private func checkSedentaryFollowUp(_ currentSteps: Int? = nil) {
-        guard sedentaryReminderSent, let reminderTime = sedentaryReminderTime else { return }
+    private func checkSedentaryFollowUp(_ currentSteps: Int) {
+        guard sedentaryReminderSent else { return }
         
-        let timeSinceReminder = Date().timeIntervalSince(reminderTime)
+        let calendar = Calendar.current
+        let reminderTime = sedentaryReminderTime ?? Date()
+        let tenMinutesAfterReminder = calendar.date(byAdding: .minute, value: 10, to: reminderTime) ?? Date()
         
-        // 获取提醒后的步数
-        healthKitManager.getSteps(from: reminderTime, to: Date()) { [weak self] stepsAfterReminder in
+        // 获取提醒后10分钟内的步数
+        healthKitManager.getSteps(from: reminderTime, to: tenMinutesAfterReminder) { [weak self] stepsAfterReminder in
             DispatchQueue.main.async {
-                self?.handleSedentaryFollowUp(stepsAfterReminder)
+                self?.evaluateSedentaryFollowUp(stepsAfterReminder)
             }
         }
     }
     
-    // MARK: - 处理久坐后续
-    private func handleSedentaryFollowUp(_ stepsAfterReminder: Int) {
-        let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
+    // MARK: - 评估久坐后续
+    private func evaluateSedentaryFollowUp(_ stepsAfterReminder: Int) {
+        let stepsIncrease = stepsAfterReminder - stepsBeforeReminder
         
-        if stepsAfterReminder >= 100 {
-            // 用户开始活动了
-            let message = ReminderContentManager.shared.getReminderContent(
-                for: "久坐",
-                subType: "moved",
-                element: userElement
+        if stepsIncrease >= 100 {
+            // 成功活动，发送完成通知
+            let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
+            systemNotificationManager.sendCompletionNotification(
+                for: userElement,
+                taskType: .sedentary
             )
             
-            notificationManager.sendFollowUpReminder(
-                type: .sedentary,
-                followUpType: .moved,
-                message: message,
-                userElement: userElement
-            )
-            
-            // 增加亲密值
-            profileManager.addIntimacy(10)
-            
-            // 重置久坐检测状态
-            resetSedentaryMonitoring()
+            print("久坐后续检测成功：步数增加 \(stepsIncrease) 步")
+        } else {
+            print("久坐后续检测：步数增加不足，仅增加 \(stepsIncrease) 步")
         }
+        
+        // 重置监测状态
+        resetSedentaryMonitoring()
     }
     
     // MARK: - 重置久坐监测
@@ -192,18 +179,11 @@ class HealthMonitoringService: ObservableObject {
             stressReminderSent = true
             stressReminderTime = Date()
             
-            // 发送压力提醒
+            // 发送压力建议通知
             let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
-            let message = ReminderContentManager.shared.getReminderContent(
-                for: "压力大",
-                subType: "建议",
-                element: userElement
-            )
-            
-            notificationManager.sendHealthReminder(
-                type: .stress,
-                message: message,
-                userElement: userElement
+            systemNotificationManager.sendSuggestionNotification(
+                for: userElement,
+                taskType: .stress
             )
             
             // 开始压力后续检测
@@ -221,55 +201,26 @@ class HealthMonitoringService: ObservableObject {
     
     // MARK: - 检查压力后续
     private func checkStressFollowUp() {
-        guard stressReminderSent, let reminderTime = stressReminderTime else { return }
+        guard stressReminderSent else { return }
         
         // 获取当前HRV
-        healthKitManager.getCurrentHRV { [weak self] currentHRV in
-            DispatchQueue.main.async {
-                self?.handleStressFollowUp(currentHRV)
-            }
-        }
-    }
-    
-    // MARK: - 处理压力后续
-    private func handleStressFollowUp(_ currentHRV: Double) {
-        let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
+        let currentHRV = healthKitManager.heartRateVariability
         let hrvThreshold = baselineHRV * 0.8
         
-        if currentHRV >= baselineHRV * 0.8 {
-            // HRV有改善
-            let message = ReminderContentManager.shared.getReminderContent(
-                for: "压力大",
-                subType: "improved",
-                element: userElement
+        if currentHRV >= hrvThreshold {
+            // HRV改善，发送完成通知
+            let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
+            systemNotificationManager.sendCompletionNotification(
+                for: userElement,
+                taskType: .stress
             )
             
-            notificationManager.sendFollowUpReminder(
-                type: .stress,
-                followUpType: .improved,
-                message: message,
-                userElement: userElement
-            )
-            
-            // 增加亲密值
-            profileManager.addIntimacy(15)
+            print("压力后续检测成功：HRV恢复到 \(currentHRV)ms")
         } else {
-            // HRV仍然低
-            let message = ReminderContentManager.shared.getReminderContent(
-                for: "压力大",
-                subType: "still_low",
-                element: userElement
-            )
-            
-            notificationManager.sendFollowUpReminder(
-                type: .stress,
-                followUpType: .stillLow,
-                message: message,
-                userElement: userElement
-            )
+            print("压力后续检测：HRV仍未改善，当前值 \(currentHRV)ms")
         }
         
-        // 重置压力检测状态
+        // 重置监测状态
         resetStressMonitoring()
     }
     
@@ -283,8 +234,6 @@ class HealthMonitoringService: ObservableObject {
 // MARK: - 健康状态枚举
 enum HealthStatus {
     case normal
-    case sedentary
-    case stressed
-    case exercising
-    case sleeping
+    case warning
+    case critical
 } 

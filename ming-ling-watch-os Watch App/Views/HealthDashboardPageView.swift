@@ -9,6 +9,8 @@ struct HealthDashboardPageView: View {
     @StateObject private var systemNotificationManager = SystemNotificationManager.shared
     @StateObject private var gifAnimationManager = GIFAnimationManager.shared
     
+    @State private var isDelayedNotification: Bool = false
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -18,11 +20,8 @@ struct HealthDashboardPageView: View {
                 // 健康卡片
                 healthCardsSection
                 
-                // GIF通知按钮
-                gifNotificationButton
-                
-                // 系统通知按钮
-                systemNotificationButton
+                // 通知测试模块
+                notificationTestSection
                 
                 // 设置入口
                 settingsSection
@@ -36,7 +35,6 @@ struct HealthDashboardPageView: View {
             // 设置通知代理
             UNUserNotificationCenter.current().delegate = systemNotificationManager
         }
-
     }
     
     // MARK: - 问候语区域
@@ -103,199 +101,103 @@ struct HealthDashboardPageView: View {
         }
     }
     
-    // MARK: - GIF通知按钮
-    private var gifNotificationButton: some View {
-        Button(action: {
-            // 显示GIF动画通知
-            showGIFNotification()
-        }) {
-            HStack(spacing: 12) {
-                GIFAnimationView(gifName: "animation1", isPlaying: true)
-                    .frame(width: 40, height: 40)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.3), lineWidth: 1)
-                    )
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("GIF动画通知")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+    // MARK: - 通知测试模块
+    private var notificationTestSection: some View {
+        VStack(spacing: 16) {
+            Text("通知测试")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+            
+            VStack(spacing: 12) {
+                // 延迟发送开关
+                HStack {
+                    Toggle("10秒后发送", isOn: $isDelayedNotification)
+                        .toggleStyle(SwitchToggleStyle(tint: PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金")))
+                        .font(.caption)
                         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
                     
-                    Text("点击查看动画效果")
-                        .font(.caption)
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                    Spacer()
                 }
+                .padding(.horizontal, 4)
                 
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5))
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.1))
-                    .overlay(
+                // 发送建议通知按钮
+                Button(action: {
+                    sendSuggestionTest()
+                }) {
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            .font(.title2)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("发送建议通知")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            
+                            Text("随机选择一个建议进行推送")
+                                .font(.caption)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                            .font(.caption)
+                    }
+                    .padding()
+                    .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.3), lineWidth: 1)
+                            .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+                            )
                     )
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    // MARK: - 显示GIF通知
-    private func showGIFNotification() {
-        // 发送一个正常的健康提醒通知，但使用GIF动画
-        let element = profileManager.userProfile.fiveElements?.primary ?? "金"
-        
-        print("发送GIF动画通知 - 用户元素: \(element)")
-        
-        // 使用现有的健康提醒通知系统，但添加GIF标识
-        systemNotificationManager.sendHealthReminderNotification(
-            for: element,
-            reminderType: .sunExposure,
-            subType: "建议",
-            useGIFAnimation: true // 新增参数，标识使用GIF动画
-        )
-    }
-    
-    // MARK: - 系统通知按钮
-    private var systemNotificationButton: some View {
-        VStack(spacing: 12) {
-            // 立即测试按钮
-            Button(action: {
-                let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
-                print("发送通知 - 用户元素: \(userElement)")
-                systemNotificationManager.sendHealthReminderNotification(
-                    for: userElement,
-                    reminderType: .sunExposure,
-                    subType: "建议"
-                )
-            }) {
-                HStack {
-                    Image(systemName: "bolt.fill")
-                        .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                        .font(.title2)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("立即测试")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                        
-                        Text("立即发送通知测试界面")
-                        .font(.caption)
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(.white.opacity(0.7))
-                        .font(.caption)
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
-                        )
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            // 晒太阳提醒测试（延时20秒）
-            Button(action: {
-                systemNotificationManager.sendHealthReminderNotificationWithDelay(
-                    for: profileManager.userProfile.fiveElements?.primary ?? "金",
-                    reminderType: .sunExposure,
-                    subType: "建议",
-                    delay: 20
-                )
-            }) {
-                HStack {
-                    Image(systemName: "sun.max.fill")
-                        .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                        .font(.title2)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("晒太阳提醒")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                .buttonStyle(PlainButtonStyle())
+                
+                // 发送完成通知按钮
+                Button(action: {
+                    sendCompletionTest()
+                }) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            .font(.title2)
                         
-                        Text("20秒后发送，测试抬腕亮屏")
-                        .font(.caption)
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
-                        .font(.caption)
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
-                        )
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            // 压力提醒测试（延时20秒）
-            Button(action: {
-                systemNotificationManager.sendHealthReminderNotificationWithDelay(
-                    for: profileManager.userProfile.fiveElements?.primary ?? "金",
-                    reminderType: .stress,
-                    subType: "建议",
-                    delay: 20
-                )
-            }) {
-                HStack {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                        .font(.title2)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("压力提醒")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("发送完成通知")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            
+                            Text("发送完成通知并增加亲密度")
+                                .font(.caption)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                        }
                         
-                        Text("20秒后发送，测试抬腕亮屏")
-                        .font(.caption)
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                            .font(.caption)
                     }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
-                        .font(.caption)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+                            )
+                    )
                 }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
-                        )
-                )
+                .buttonStyle(PlainButtonStyle())
             }
-            .buttonStyle(PlainButtonStyle())
         }
     }
     
@@ -351,6 +253,32 @@ struct HealthDashboardPageView: View {
         case .sleep:
             return healthKitManager.sleepAnalysis
         }
+    }
+    
+    // MARK: - 发送建议通知
+    private func sendSuggestionTest() {
+        let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
+        let delay = isDelayedNotification ? 10.0 : 1.0
+        
+        print("发送建议通知 - 用户元素: \(userElement), 延迟: \(delay)秒")
+        
+        systemNotificationManager.sendRandomSuggestionNotification(
+            for: userElement,
+            delay: delay
+        )
+    }
+    
+    // MARK: - 发送完成通知
+    private func sendCompletionTest() {
+        let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
+        let delay = isDelayedNotification ? 10.0 : 1.0
+        
+        print("发送完成通知 - 用户元素: \(userElement), 延迟: \(delay)秒")
+        
+        systemNotificationManager.sendRandomCompletionNotification(
+            for: userElement,
+            delay: delay
+        )
     }
 }
 

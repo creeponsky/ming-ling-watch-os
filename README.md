@@ -29,7 +29,7 @@ ming-ling-watch-os Watch App/
 │   ├── BaziAPIService.swift       # 八字API服务
 │   ├── UserProfileManager.swift   # 用户档案管理
 │   ├── HealthMonitoringService.swift # 健康监测服务
-│   ├── NotificationManager.swift  # 通知管理
+│   ├── SystemNotificationManager.swift # 系统通知管理
 │   └── EnvironmentSensorManager.swift # 环境传感器管理
 ├── Views/
 │   ├── BirthdaySelectionView.swift # 生日选择界面
@@ -49,52 +49,63 @@ ming-ling-watch-os Watch App/
 - **FiveElements**: 五行属性模型
 
 ### 服务层
-- **BaziAPIService**: 调用八字API获取五行属性
-- **HealthMonitoringService**: 后台健康监测服务
-- **NotificationManager**: 本地通知管理
-- **EnvironmentSensorManager**: 环境传感器管理
+- **BaziAPIService**: 八字API服务，获取五行属性
+- **UserProfileManager**: 用户档案管理，包括亲密值系统
+- **HealthMonitoringService**: 健康监测服务，处理各种健康数据
+- **SystemNotificationManager**: 系统通知管理，支持建议和完成通知
+- **EnvironmentSensorManager**: 环境传感器管理，监测光线和位置
 
-### 界面层
-- **BirthdaySelectionView**: 首次使用时的生日选择
-- **NewMainDashboardView**: 主界面，显示健康卡片
-- **SettingsView**: 设置和数据概览
+### 管理层
+- **HealthKitManager**: HealthKit数据管理
+- **LocationManager**: 位置服务管理
+- **MotionManager**: 运动数据管理
 
-## 使用流程
+### 视图层
+- **BirthdaySelectionView**: 生日选择界面
+- **NewMainDashboardView**: 主仪表板界面
+- **SettingsView**: 设置界面
 
-1. **首次启动**: 用户选择生日，系统调用API计算五行属性
-2. **主界面**: 显示个性化问候语和五个健康监测卡片
-3. **后台监测**: 持续监测健康数据，触发条件时发送通知
-4. **设置界面**: 查看数据概览和修改设置
+## 通知系统
 
-## 五行理论应用
+### 通知类型
+1. **建议通知**: 当检测到健康问题时发送个性化建议
+2. **完成通知**: 当用户完成建议后发送鼓励和亲密度奖励
 
-### 五行属性对应
-- **金**: 主肺气，喜清润
-- **木**: 主肝气，喜舒展  
-- **水**: 主肾气，喜温润
-- **火**: 主心气，喜清凉
-- **土**: 主脾气，喜温和
+### 通知特性
+- 支持GIF动画显示
+- 自动处理亲密度奖励
+- 支持延时发送
+- 支持随机建议/完成通知
+- 自定义Long Look界面
 
-### 个性化建议
-每个健康提醒都根据用户的五行属性提供不同的建议内容，确保建议的针对性和有效性。
+## 亲密值系统
+
+### 等级划分
+- **等级1（0-49分）**: 陌生
+- **等级2（50-79分）**: 友好
+- **等级3（80-100分）**: 亲密
+
+### 获取方式
+- 完成健康建议：+20点
+- 改善压力状态：+20点
+- 开始活动：+20点
 
 ## 开发环境
 
-- **平台**: watchOS 9.0+
-- **语言**: Swift 5.0+
-- **框架**: SwiftUI, HealthKit, CoreLocation
-- **API**: 八字测算API (https://doc.yuanfenju.com/bazi/cesuan.html)
+- **平台**: watchOS 10.0+
+- **语言**: Swift 5.9
+- **框架**: SwiftUI, HealthKit, UserNotifications
+- **设备**: Apple Watch Series 4+
+
+## 安装和运行
+
+1. 克隆项目到本地
+2. 使用Xcode打开项目
+3. 选择Apple Watch模拟器或真机
+4. 运行项目
 
 ## 注意事项
 
-1. 需要用户授权HealthKit、位置和通知权限
-2. 八字API需要网络连接
-3. 环境传感器数据在模拟器中为模拟数据
-4. 后台监测服务需要设备支持
-
-## 未来扩展
-
-- 支持更多健康指标监测
-- 增加数据分析和趋势图表
-- 支持自定义提醒规则
-- 增加社交分享功能 
+- 需要HealthKit权限来访问健康数据
+- 需要通知权限来发送提醒
+- 需要位置权限来提供环境相关建议 

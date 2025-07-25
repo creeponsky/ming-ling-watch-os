@@ -5,6 +5,7 @@ struct TestView: View {
     @StateObject private var profileManager = UserProfileManager.shared
     @StateObject private var healthMonitoringService = HealthMonitoringService.shared
     @StateObject private var intimacyChangeManager = IntimacyChangeManager.shared
+    @StateObject private var systemNotificationManager = SystemNotificationManager.shared
     
     var body: some View {
         ScrollView {
@@ -212,84 +213,48 @@ struct TestView: View {
     // MARK: - 测试方法
     private func simulateSedentaryReminder() {
         let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
-        let message = ReminderContentManager.shared.getReminderContent(
-            for: "久坐",
-            subType: "建议",
-            element: userElement
-        )
         
-        NotificationManager.shared.sendHealthReminder(
-            type: .sedentary,
-            message: message,
-            userElement: userElement
+        systemNotificationManager.sendSuggestionNotification(
+            for: userElement,
+            taskType: .sedentary
         )
     }
     
     private func simulateActivityStart() {
         let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
-        let message = ReminderContentManager.shared.getReminderContent(
-            for: "久坐",
-            subType: "moved",
-            element: userElement
-        )
         
-        NotificationManager.shared.sendFollowUpReminder(
-            type: .sedentary,
-            followUpType: .moved,
-            message: message,
-            userElement: userElement
+        systemNotificationManager.sendCompletionNotification(
+            for: userElement,
+            taskType: .sedentary
         )
-        
-        // 增加亲密值
-        profileManager.addIntimacy(10)
     }
     
     private func simulateStressReminder() {
         let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
-        let message = ReminderContentManager.shared.getReminderContent(
-            for: "压力大",
-            subType: "建议",
-            element: userElement
-        )
         
-        NotificationManager.shared.sendHealthReminder(
-            type: .stress,
-            message: message,
-            userElement: userElement
+        systemNotificationManager.sendSuggestionNotification(
+            for: userElement,
+            taskType: .stress
         )
     }
     
     private func simulateStressImprovement() {
         let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
-        let message = ReminderContentManager.shared.getReminderContent(
-            for: "压力大",
-            subType: "improved",
-            element: userElement
-        )
         
-        NotificationManager.shared.sendFollowUpReminder(
-            type: .stress,
-            followUpType: .improved,
-            message: message,
-            userElement: userElement
+        systemNotificationManager.sendCompletionNotification(
+            for: userElement,
+            taskType: .stress
         )
-        
-        // 增加亲密值
-        profileManager.addIntimacy(15)
     }
     
     private func getHealthStatusText() -> String {
         switch healthMonitoringService.currentHealthStatus {
         case .normal:
             return "正常"
-        case .sedentary:
-            return "久坐"
-        case .stressed:
-            return "压力大"
-        case .exercising:
-            return "运动中"
-        case .sleeping:
-            return "睡眠中"
+        case .warning:
+            return "警告"
+        case .critical:
+            return "严重"
         }
     }
 }

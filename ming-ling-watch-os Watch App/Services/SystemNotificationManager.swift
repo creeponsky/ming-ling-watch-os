@@ -37,52 +37,12 @@ class SystemNotificationManager: NSObject, ObservableObject {
         UNUserNotificationCenter.current().setNotificationCategories([petCategory])
     }
     
-    // MARK: - 发送宠物通知
-    func sendPetNotification(for element: String, type: NotificationUtils.NotificationType = .encouragement) {
-        let content = NotificationUtils.getNotificationContent(for: element, type: type)
-        
-        let notification = UNMutableNotificationContent()
-        notification.title = content.title
-        notification.body = content.message
-        notification.sound = .default
-        
-        // 添加自定义数据
-        notification.userInfo = [
-            "element": element,
-            "type": type.rawValue
-        ]
-        
-        // 设置通知类别以启用自定义 Long Look 界面
-        notification.categoryIdentifier = "PET_NOTIFICATION"
-        
-        // 创建触发器（立即触发）
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-        
-        // 创建请求
-        let request = UNNotificationRequest(
-            identifier: "pet-notification-\(UUID().uuidString)",
-            content: notification,
-            trigger: trigger
-        )
-        
-        // 发送通知
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("发送通知失败: \(error.localizedDescription)")
-            } else {
-                print("宠物通知已发送")
-            }
+    // MARK: - 发送建议通知
+    func sendSuggestionNotification(for element: String, taskType: TaskType, delay: TimeInterval = 1) {
+        guard let content = NotificationUtils.getSuggestionContent(for: element, taskType: taskType) else {
+            print("无法获取建议内容")
+            return
         }
-    }
-    
-    // MARK: - 发送健康提醒通知
-    func sendHealthReminderNotification(for element: String, reminderType: NotificationUtils.HealthReminderType, subType: String = "建议", useGIFAnimation: Bool = false) {
-        sendHealthReminderNotificationWithDelay(for: element, reminderType: reminderType, subType: subType, delay: 1, useGIFAnimation: useGIFAnimation)
-    }
-    
-    // MARK: - 发送延时健康提醒通知
-    func sendHealthReminderNotificationWithDelay(for element: String, reminderType: NotificationUtils.HealthReminderType, subType: String = "建议", delay: TimeInterval, useGIFAnimation: Bool = false) {
-        let content = NotificationUtils.getHealthReminderContent(for: element, reminderType: reminderType, subType: subType)
         
         let notification = UNMutableNotificationContent()
         notification.title = content.title
@@ -92,59 +52,20 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 添加自定义数据
         notification.userInfo = [
             "element": element,
-            "reminderType": reminderType.rawValue,
-            "subType": subType,
-            "type": "health_reminder",
-            "useGIFAnimation": useGIFAnimation
-        ]
-        
-        // 设置通知类别以启用自定义 Long Look 界面
-        notification.categoryIdentifier = "PET_NOTIFICATION"
-        
-        // 创建触发器（延时触发）
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
-        
-        // 创建请求
-        let request = UNNotificationRequest(
-            identifier: "health-reminder-\(reminderType.rawValue)-\(UUID().uuidString)",
-            content: notification,
-            trigger: trigger
-        )
-        
-        // 发送通知
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("发送健康提醒通知失败: \(error.localizedDescription)")
-            } else {
-                print("健康提醒通知已安排，\(delay)秒后发送")
-            }
-        }
-    }
-    
-    // MARK: - 发送定时提醒通知
-    func scheduleReminderNotification(for element: String, type: NotificationUtils.NotificationType, timeInterval: TimeInterval) {
-        let content = NotificationUtils.getNotificationContent(for: element, type: type)
-        
-        let notification = UNMutableNotificationContent()
-        notification.title = content.title
-        notification.body = content.message
-        notification.sound = .default
-        
-        // 添加自定义数据
-        notification.userInfo = [
-            "element": element,
-            "type": type.rawValue
+            "taskType": taskType.rawValue,
+            "type": "suggestion",
+            "useGIFAnimation": false
         ]
         
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
         // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
-            identifier: "scheduled-notification-\(UUID().uuidString)",
+            identifier: "suggestion-\(taskType.rawValue)-\(UUID().uuidString)",
             content: notification,
             trigger: trigger
         )
@@ -152,11 +73,184 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 发送通知
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("发送定时通知失败: \(error.localizedDescription)")
+                print("发送建议通知失败: \(error.localizedDescription)")
             } else {
-                print("定时通知已安排")
+                print("建议通知已发送")
             }
         }
+    }
+    
+    // MARK: - 发送完成通知
+    func sendCompletionNotification(for element: String, taskType: TaskType, delay: TimeInterval = 1) {
+        guard let content = NotificationUtils.getCompletionContent(for: element, taskType: taskType) else {
+            print("无法获取完成内容")
+            return
+        }
+        
+        let notification = UNMutableNotificationContent()
+        notification.title = content.title
+        notification.body = content.message
+        notification.sound = .default
+        
+        // 添加自定义数据
+        notification.userInfo = [
+            "element": element,
+            "taskType": taskType.rawValue,
+            "type": "completion",
+            "useGIFAnimation": true
+        ]
+        
+        // 设置通知类别以启用自定义 Long Look 界面
+        notification.categoryIdentifier = "PET_NOTIFICATION"
+        
+        // 创建触发器
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        
+        // 创建请求
+        let request = UNNotificationRequest(
+            identifier: "completion-\(taskType.rawValue)-\(UUID().uuidString)",
+            content: notification,
+            trigger: trigger
+        )
+        
+        // 发送通知
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("发送完成通知失败: \(error.localizedDescription)")
+            } else {
+                print("完成通知已发送")
+            }
+        }
+    }
+    
+    // MARK: - 发送随机建议通知
+    func sendRandomSuggestionNotification(for element: String, delay: TimeInterval = 1) {
+        guard let (taskType, suggestion) = ReminderContentManager.shared.getRandomSuggestionContent(for: element) else {
+            print("无法获取随机建议内容")
+            return
+        }
+        
+        let notification = UNMutableNotificationContent()
+        notification.title = taskType.title
+        notification.body = suggestion.message
+        notification.sound = .default
+        
+        // 添加自定义数据
+        notification.userInfo = [
+            "element": element,
+            "taskType": taskType.rawValue,
+            "type": "suggestion",
+            "useGIFAnimation": false
+        ]
+        
+        // 设置通知类别以启用自定义 Long Look 界面
+        notification.categoryIdentifier = "PET_NOTIFICATION"
+        
+        // 创建触发器
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        
+        // 创建请求
+        let request = UNNotificationRequest(
+            identifier: "random-suggestion-\(UUID().uuidString)",
+            content: notification,
+            trigger: trigger
+        )
+        
+        // 发送通知
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("发送随机建议通知失败: \(error.localizedDescription)")
+            } else {
+                print("随机建议通知已发送")
+            }
+        }
+    }
+    
+    // MARK: - 发送随机完成通知
+    func sendRandomCompletionNotification(for element: String, delay: TimeInterval = 1) {
+        guard let (taskType, completion) = ReminderContentManager.shared.getRandomCompletionContent(for: element) else {
+            print("无法获取随机完成内容")
+            return
+        }
+        
+        let notification = UNMutableNotificationContent()
+        notification.title = taskType.title
+        notification.body = completion.message
+        notification.sound = .default
+        
+        // 添加自定义数据
+        notification.userInfo = [
+            "element": element,
+            "taskType": taskType.rawValue,
+            "type": "completion",
+            "useGIFAnimation": true
+        ]
+        
+        // 设置通知类别以启用自定义 Long Look 界面
+        notification.categoryIdentifier = "PET_NOTIFICATION"
+        
+        // 创建触发器
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        
+        // 创建请求
+        let request = UNNotificationRequest(
+            identifier: "random-completion-\(UUID().uuidString)",
+            content: notification,
+            trigger: trigger
+        )
+        
+        // 发送通知
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("发送随机完成通知失败: \(error.localizedDescription)")
+            } else {
+                print("随机完成通知已发送")
+            }
+        }
+    }
+    
+    // MARK: - 发送GIF通知（兼容旧接口）
+    func sendGIFNotification(for element: String, intimacyGrade: Int, emotion: String, message: String, delay: TimeInterval = 1) {
+        let notification = UNMutableNotificationContent()
+        notification.title = "宠物消息"
+        notification.body = message
+        notification.sound = .default
+        
+        // 添加自定义数据
+        notification.userInfo = [
+            "element": element,
+            "intimacyGrade": intimacyGrade,
+            "emotion": emotion,
+            "type": "gif",
+            "useGIFAnimation": true
+        ]
+        
+        // 设置通知类别以启用自定义 Long Look 界面
+        notification.categoryIdentifier = "PET_NOTIFICATION"
+        
+        // 创建触发器
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        
+        // 创建请求
+        let request = UNNotificationRequest(
+            identifier: "gif-notification-\(UUID().uuidString)",
+            content: notification,
+            trigger: trigger
+        )
+        
+        // 发送通知
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("发送GIF通知失败: \(error.localizedDescription)")
+            } else {
+                print("GIF通知已发送")
+            }
+        }
+    }
+    
+    // MARK: - 发送延时GIF通知（兼容旧接口）
+    func sendGIFNotificationWithDelay(for element: String, intimacyGrade: Int, emotion: String, message: String, delay: TimeInterval) {
+        sendGIFNotification(for: element, intimacyGrade: intimacyGrade, emotion: emotion, message: message, delay: delay)
     }
     
     // MARK: - 取消所有通知
@@ -190,8 +284,16 @@ extension SystemNotificationManager: UNUserNotificationCenterDelegate {
            let typeString = userInfo["type"] as? String {
             print("用户点击了通知 - 元素: \(element), 类型: \(typeString)")
             
-            // 这里可以添加处理通知点击的逻辑
-            // 比如打开特定的页面或执行特定的操作
+            // 如果是完成通知，增加亲密度
+            if typeString == "completion" {
+                if let taskTypeString = userInfo["taskType"] as? String,
+                   let taskType = TaskType(rawValue: taskTypeString),
+                   let completion = ReminderContentManager.shared.getCompletionContent(for: taskType, element: element) {
+                    // 增加亲密度
+                    UserProfileManager.shared.addIntimacy(completion.intimacyPoints)
+                    print("完成通知：增加亲密度 \(completion.intimacyPoints) 点")
+                }
+            }
         }
         
         completionHandler()

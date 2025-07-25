@@ -20,18 +20,51 @@ class GIFAnimationManager: ObservableObject {
     
     // MARK: - 加载GIF动画
     func loadGIF(named gifName: String) {
-        guard let url = Bundle.main.url(forResource: gifName, withExtension: "gif") else {
-            print("❌ 无法找到GIF文件: \(gifName)")
-            // 清空当前状态
-            gifImages.removeAll()
-            gifDurations.removeAll()
-            totalFrames = 0
-            currentImage = nil
+        // 首先尝试从Bundle中加载
+        if let url = Bundle.main.url(forResource: gifName, withExtension: "gif") {
+            print("✅ 从Bundle加载GIF文件: \(gifName)")
+            loadGIFFromURL(url)
             return
         }
         
-        print("✅ 加载GIF文件: \(gifName)")
-        loadGIFFromURL(url)
+        // 如果Bundle中没有，尝试从项目根目录的assets文件夹加载
+        let projectRoot = FileManager.default.currentDirectoryPath
+        let assetsPath = "\(projectRoot)/assets/\(gifName).gif"
+        let assetsURL = URL(fileURLWithPath: assetsPath)
+        
+        if FileManager.default.fileExists(atPath: assetsPath) {
+            print("✅ 从assets目录加载GIF文件: \(assetsPath)")
+            loadGIFFromURL(assetsURL)
+            return
+        }
+        
+        // 如果都找不到，尝试从应用Bundle的assets目录加载
+        if let bundleURL = Bundle.main.url(forResource: "assets/\(gifName)", withExtension: "gif") {
+            print("✅ 从Bundle的assets目录加载GIF文件: \(gifName)")
+            loadGIFFromURL(bundleURL)
+            return
+        }
+        
+        // 尝试从Bundle中加载不带路径的文件名
+        let fileName = gifName.components(separatedBy: "/").last ?? gifName
+        if let bundleURL = Bundle.main.url(forResource: fileName, withExtension: "gif") {
+            print("✅ 从Bundle加载文件名: \(fileName)")
+            loadGIFFromURL(bundleURL)
+            return
+        }
+        
+        print("❌ 无法找到GIF文件: \(gifName)")
+        print("尝试过的路径:")
+        print("  - Bundle: \(gifName).gif")
+        print("  - Assets: \(assetsPath)")
+        print("  - Bundle Assets: assets/\(gifName).gif")
+        print("  - Bundle FileName: \(fileName).gif")
+        
+        // 清空当前状态
+        gifImages.removeAll()
+        gifDurations.removeAll()
+        totalFrames = 0
+        currentImage = nil
     }
     
     // MARK: - 从URL加载GIF

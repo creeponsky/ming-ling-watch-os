@@ -17,11 +17,6 @@ struct HealthDetailView: View {
                 // 个性化建议
                 personalizedAdviceSection
                 
-                // 后续提醒（如果有）
-                if let followUp = reminder.followUp {
-                    followUpSection(followUp)
-                }
-                
                 Spacer(minLength: 20)
             }
             .padding(.horizontal)
@@ -58,40 +53,16 @@ struct HealthDetailView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
             
-            ForEach(reminder.trigger.conditions, id: \.self) { condition in
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.caption)
-                    
-                    Text(condition)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                    
-                    Spacer()
-                }
-            }
-            
-            if !reminder.trigger.detection.isEmpty {
-                Text("检测方式")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 8)
-                
-                ForEach(reminder.trigger.detection, id: \.self) { detection in
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(reminder.trigger.conditions, id: \.self) { condition in
                     HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "sensor.tag.radiowaves.forward.fill")
-                            .foregroundColor(.blue)
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
                             .font(.caption)
                         
-                        Text(detection)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.leading)
-                        
-                        Spacer()
+                        Text(condition)
+                            .font(.body)
+                            .foregroundColor(.primary)
                     }
                 }
             }
@@ -115,11 +86,18 @@ struct HealthDetailView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
             
-            Text(reminder.getReminder(for: userElement))
-                .font(.body)
-                .foregroundColor(.primary)
-                .multilineTextAlignment(.leading)
-                .lineSpacing(4)
+            if let suggestion = reminder.getSuggestionContent(for: userElement) {
+                Text(suggestion)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(4)
+            } else {
+                Text("暂无个性化建议")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .italic()
+            }
         }
         .padding()
         .background(
@@ -131,77 +109,14 @@ struct HealthDetailView: View {
                 )
         )
     }
-    
-    // MARK: - 后续提醒区域
-    private func followUpSection(_ followUp: FollowUpReminders) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("后续提醒")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
-            
-            if let improved = followUp.improved {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("改善后")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.green)
-                    
-                    Text(improved[userElement] ?? "继续保持良好的状态！")
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                }
-            }
-            
-            if let stillLow = followUp.stillLow {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("仍需改善")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.orange)
-                    
-                    Text(stillLow[userElement] ?? "继续努力改善健康状况")
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                }
-            }
-            
-            if let moved = followUp.moved {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("活动后")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.blue)
-                    
-                    Text(moved[userElement] ?? "活动后记得适当休息")
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.blue.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                )
-        )
-    }
 }
 
 // MARK: - 预览
 struct HealthDetailView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationView {
-            HealthDetailView(
-                reminder: HealthReminder.allReminders[0],
-                userElement: "金"
-            )
-        }
+        HealthDetailView(
+            reminder: HealthReminder.allReminders[0],
+            userElement: "金"
+        )
     }
 } 

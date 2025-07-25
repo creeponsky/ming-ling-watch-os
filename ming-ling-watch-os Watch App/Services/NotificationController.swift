@@ -49,6 +49,7 @@ final class NotificationController: WKUserNotificationHostingController<PetNotif
 // MARK: - 自定义通知视图
 struct PetNotificationLongLookView: View {
     @State private var showMore = false
+    @StateObject private var profileManager = UserProfileManager.shared
     
     let content: UNNotificationContent?
     let date: Date?
@@ -61,89 +62,145 @@ struct PetNotificationLongLookView: View {
             PetUtils.getElementBackgroundColor(for: userElement)
                 .ignoresSafeArea()
             
-            // 主内容区域 - 只包含对话框，不受GIF影响
-            VStack(spacing: 0) {
-                // 对话框 - 左上角，固定大小
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(getNotificationMessage())
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(PetUtils.getElementTextColor(for: userElement))
-                            .multilineTextAlignment(.leading)
-                            .lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 4)
-                    .background(
+            // 对话框card - 固定大小，不受其他元素影响
+            VStack(alignment: .leading, spacing: 6) {
+                Text(getNotificationMessage())
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(PetUtils.getElementTextColor(for: userElement))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(width: 112, height: 80, alignment: .leading) // 缩小宽度到70%：160 * 0.7 = 112
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.95))
+                    .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.95))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(PetUtils.getElementDialogColor(for: userElement), lineWidth: 1.5)
-                            )
+                            .stroke(PetUtils.getElementDialogColor(for: userElement), lineWidth: 1.5)
                     )
-                    .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
-                    
-                    Spacer()
-                }
-                .padding(.top, 4)
-                .padding(.leading, 4)
-                
-                Spacer()
-            }
-            .frame(maxHeight: 200)
+            )
+            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+            .position(x: 70, y: 50) // 更靠左上角
             
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
+            // 亲密度显示 - 绝对定位在对话框右下角
+            if isCompletionNotification() {
+                HStack(spacing: 4) {
+                    Image(systemName: getIntimacyIcon())
+                        .font(.caption2)
+                        .foregroundColor(Color(hex: profileManager.userProfile.intimacyGradeColor))
                     
-                    Group {
-                        if let useGIFAnimation = notificationUserInfo["useGIFAnimation"] as? Bool, useGIFAnimation {
-                            GIFAnimationView(gifName: PetUtils.getPetGIFName(for: userElement), isPlaying: true)
-                                // .frame(width: 300, height: 300)
-                                // .offset(x: 50, y: 80)
-                                .frame(width: 80, height: 80)
-                                .offset(x: 20, y: 40)
-                        } else {
-                            Image(PetUtils.getPetSpeakImageName(for: userElement))
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 80, height: 80)
-                                .offset(x: 20, y: 40)
-                        }
-                    }
+                    Text("+\(getIntimacyPoints())")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(PetUtils.getElementTextColor(for: userElement))
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.8))
+                )
+                .position(x: 110, y: 75) // 调整到新的对话框右下角
+            }
+            
+            // GIF动画层 - 使用绝对定位，不影响其他元素
+            Group {
+                if let useGIFAnimation = notificationUserInfo["useGIFAnimation"] as? Bool, useGIFAnimation {
+                    GIFAnimationView(gifName: getGIFName(), isPlaying: true)
+                        .frame(width: 240, height: 240) // 1.5倍：160 * 1.5 = 240
+                } else {
+                    Image(PetUtils.getPetSpeakImageName(for: userElement))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 160, height: 160) // speak保持原大小
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity) // 占满整个空间
+            .position(x: 140, y: 140) // 往下移动：120 -> 140
         }
         .onAppear {
             loadNotificationContent()
         }
     }
     
-    // MARK: - 获取通知消息
-    private func getNotificationMessage() -> String {
-        if let reminderTypeString = notificationUserInfo["reminderType"] as? String,
-           let reminderType = NotificationUtils.HealthReminderType(rawValue: reminderTypeString),
-           let subType = notificationUserInfo["subType"] as? String {
-            // 健康提醒通知
-            return ReminderContentManager.shared.getReminderContent(
-                for: reminderTypeString,
-                subType: subType,
-                element: userElement
-            )
-        } else if let typeString = notificationUserInfo["type"] as? String {
-            // 其他类型通知
-            return PetUtils.getRandomMessage(for: userElement)
-        } else {
-            // 默认消息
-            return "今天也要加油哦！"
+    // MARK: - 判断是否为完成通知
+    private func isCompletionNotification() -> Bool {
+        return notificationUserInfo["type"] as? String == "completion"
+    }
+    
+    // MARK: - 获取亲密度图标
+    private func getIntimacyIcon() -> String {
+        let intimacyGrade = profileManager.userProfile.intimacyGrade
+        switch intimacyGrade {
+        case 1:
+            return "heart"
+        case 2:
+            return "heart.fill"
+        case 3:
+            return "heart.circle.fill"
+        default:
+            return "heart"
         }
     }
     
-
+    // MARK: - 获取亲密度奖励点数
+    private func getIntimacyPoints() -> Int {
+        if let taskTypeString = notificationUserInfo["taskType"] as? String,
+           let taskType = TaskType(rawValue: taskTypeString),
+           let completion = ReminderContentManager.shared.getCompletionContent(for: taskType, element: userElement) {
+            return completion.intimacyPoints
+        }
+        return 20 // 默认奖励
+    }
+    
+    // MARK: - 获取GIF名称
+    private func getGIFName() -> String {
+        let intimacyGrade = profileManager.userProfile.intimacyGrade
+        return PetUtils.getPetGIFName(for: userElement, intimacyGrade: intimacyGrade)
+    }
+    
+    // MARK: - 获取通知消息
+    private func getNotificationMessage() -> String {
+        if let typeString = notificationUserInfo["type"] as? String {
+            switch typeString {
+            case "suggestion":
+                // 建议通知
+                if let taskTypeString = notificationUserInfo["taskType"] as? String,
+                   let taskType = TaskType(rawValue: taskTypeString),
+                   let suggestion = ReminderContentManager.shared.getSuggestionContent(for: taskType, element: userElement) {
+                    return suggestion.message
+                } else {
+                    // 如果没有找到具体的任务类型，尝试获取随机建议
+                    if let suggestion = ReminderContentManager.shared.getRandomSuggestionContent(for: userElement) {
+                        return suggestion.1.message
+                    }
+                }
+            case "completion":
+                // 完成通知
+                if let taskTypeString = notificationUserInfo["taskType"] as? String,
+                   let taskType = TaskType(rawValue: taskTypeString),
+                   let completion = ReminderContentManager.shared.getCompletionContent(for: taskType, element: userElement) {
+                    return completion.message
+                } else {
+                    // 如果没有找到具体的任务类型，尝试获取随机完成
+                    if let completion = ReminderContentManager.shared.getRandomCompletionContent(for: userElement) {
+                        return completion.1.message
+                    }
+                }
+            case "gif":
+                // GIF通知
+                if let message = content?.body {
+                    return message
+                }
+            default:
+                break
+            }
+        }
+        
+        // 默认消息
+        return "今天也要加油哦！"
+    }
     
     // MARK: - 加载通知内容
     private func loadNotificationContent() {
@@ -157,7 +214,8 @@ struct PetNotificationLongLookView: View {
         
         // 检查是否使用GIF动画
         if let useGIFAnimation = notificationUserInfo["useGIFAnimation"] as? Bool, useGIFAnimation {
-            print("GIF动画名称: \(PetUtils.getPetGIFName(for: userElement))")
+            let gifName = getGIFName()
+            print("GIF动画名称: \(gifName)")
         } else {
             print("图片名称: \(PetUtils.getPetSpeakImageName(for: userElement))")
         }

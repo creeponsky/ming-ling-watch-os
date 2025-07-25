@@ -5,72 +5,79 @@ class NotificationUtils {
     
     // MARK: - 通知类型
     enum NotificationType: String, CaseIterable {
-        case health = "health"
-        case reminder = "reminder"
-        case encouragement = "encouragement"
-        case achievement = "achievement"
-        
-        var title: String {
-            switch self {
-            case .health:
-                return "健康提醒"
-            case .reminder:
-                return "温馨提醒"
-            case .encouragement:
-                return "鼓励"
-            case .achievement:
-                return "成就"
-            }
-        }
-    }
-    
-    // MARK: - 健康提醒类型
-    enum HealthReminderType: String, CaseIterable {
-        case sunExposure = "晒太阳"
-        case stress = "压力大"
-        case sedentary = "久坐"
-        case exercise = "运动检测"
-        case sleep = "睡眠监测"
+        case suggestion = "建议"
+        case completion = "完成"
         
         var title: String {
             return self.rawValue
         }
     }
     
-    // MARK: - 获取通知内容
-    static func getNotificationContent(for element: String, type: NotificationType = .encouragement) -> NotificationContent {
-        let message = PetUtils.getRandomMessage(for: element)
+    // MARK: - 获取建议通知内容
+    static func getSuggestionContent(for element: String, taskType: TaskType) -> NotificationContent? {
+        guard let suggestion = ReminderContentManager.shared.getSuggestionContent(for: taskType, element: element) else {
+            return nil
+        }
+        
         let themeConfig = PetUtils.getElementThemeConfig(for: element)
         
         return NotificationContent(
-            title: type.title,
-            message: message,
+            title: taskType.title,
+            message: suggestion.message,
             element: element,
             themeConfig: themeConfig,
-            type: type
+            type: .suggestion
         )
     }
     
-    // MARK: - 获取健康提醒内容
-    static func getHealthReminderContent(for element: String, reminderType: HealthReminderType, subType: String = "建议") -> NotificationContent {
-        let message = getHealthReminderMessage(for: element, reminderType: reminderType, subType: subType)
+    // MARK: - 获取完成通知内容
+    static func getCompletionContent(for element: String, taskType: TaskType) -> NotificationContent? {
+        guard let completion = ReminderContentManager.shared.getCompletionContent(for: taskType, element: element) else {
+            return nil
+        }
+        
         let themeConfig = PetUtils.getElementThemeConfig(for: element)
         
         return NotificationContent(
-            title: reminderType.title,
-            message: message,
+            title: taskType.title,
+            message: completion.message,
             element: element,
             themeConfig: themeConfig,
-            type: .health
+            type: .completion
         )
     }
     
-    // MARK: - 获取健康提醒消息
-    private static func getHealthReminderMessage(for element: String, reminderType: HealthReminderType, subType: String) -> String {
-        return ReminderContentManager.shared.getReminderContent(
-            for: reminderType.rawValue,
-            subType: subType,
-            element: element
+    // MARK: - 随机获取建议通知内容
+    static func getRandomSuggestionContent(for element: String) -> NotificationContent? {
+        guard let (taskType, suggestion) = ReminderContentManager.shared.getRandomSuggestionContent(for: element) else {
+            return nil
+        }
+        
+        let themeConfig = PetUtils.getElementThemeConfig(for: element)
+        
+        return NotificationContent(
+            title: taskType.title,
+            message: suggestion.message,
+            element: element,
+            themeConfig: themeConfig,
+            type: .suggestion
+        )
+    }
+    
+    // MARK: - 随机获取完成通知内容
+    static func getRandomCompletionContent(for element: String) -> NotificationContent? {
+        guard let (taskType, completion) = ReminderContentManager.shared.getRandomCompletionContent(for: element) else {
+            return nil
+        }
+        
+        let themeConfig = PetUtils.getElementThemeConfig(for: element)
+        
+        return NotificationContent(
+            title: taskType.title,
+            message: completion.message,
+            element: element,
+            themeConfig: themeConfig,
+            type: .completion
         )
     }
 }
