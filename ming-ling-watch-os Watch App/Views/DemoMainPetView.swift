@@ -52,14 +52,18 @@ struct DemoMainPetView: View {
                         // 底部控制区域
                         bottomControlArea
                     }
-                    .offset(x: demoManager.demoProfile.intimacyGrade < 3 ? swipeOffset : 0)
-                    .opacity(demoManager.demoProfile.intimacyGrade < 3 ? (1.0 - abs(swipeOffset) / 200.0) : 1.0)
+                    .offset(x: (demoManager.demoProfile.intimacyGrade < 3 && 
+                               (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted)) ? swipeOffset : 0)
+                    .opacity((demoManager.demoProfile.intimacyGrade < 3 && 
+                             (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted)) ? max(0.0, 1.0 - abs(swipeOffset) / 200.0) : 1.0)
                     
                     // 健康检测页面预览（左滑时显示）
-                    if isSwipeActive && swipeOffset < -50 && demoManager.demoProfile.intimacyGrade < 3 {
+                    if isSwipeActive && swipeOffset < -50 && demoManager.demoProfile.intimacyGrade < 3 && 
+                       (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) {
                         DemoHealthDetectionView()
                             .offset(x: geometry.size.width + swipeOffset)
                             .opacity(abs(swipeOffset) / 200.0)
+                            .allowsHitTesting(false) // 防止手势冲突
                     }
                     
                     // 全屏欢迎对话框
@@ -72,8 +76,9 @@ struct DemoMainPetView: View {
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in
-                        // 只处理左滑手势，且亲密度小于3级
-                        if value.translation.width < 0 && demoManager.demoProfile.intimacyGrade < 3 {
+                        // 只处理左滑手势，且亲密度小于3级，且在允许的状态下
+                        if value.translation.width < 0 && demoManager.demoProfile.intimacyGrade < 3 && 
+                           (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) {
                             isSwipeActive = true
                             swipeOffset = value.translation.width
                             print("🔄 左滑手势: translation.width = \(value.translation.width)")
@@ -82,12 +87,6 @@ struct DemoMainPetView: View {
                     .onEnded { value in
                         print("🔄 手势结束: translation.width = \(value.translation.width), 当前状态 = \(demoManager.demoState.rawValue)")
                         
-                        // 重置滑动状态
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            swipeOffset = 0
-                            isSwipeActive = false
-                        }
-                        
                         if value.translation.width < -80 {
                             print("✅ 手势距离满足条件")
                             
@@ -95,19 +94,33 @@ struct DemoMainPetView: View {
                             if demoManager.showNotificationBar && demoManager.demoState == .mainPage {
                                 print("👋 关闭欢迎对话框")
                                 dismissWelcome()
-                            } else if (demoManager.demoState == .mainPage || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) && demoManager.demoProfile.intimacyGrade < 3 {
-                                print("✅ 状态满足条件，触发页面跳转")
+                            } else if (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) && demoManager.demoProfile.intimacyGrade < 3 {
+                                print("✅ 状态满足条件，触发导航")
+                                // 直接触发导航，让navigationDestination处理过渡
                                 showHealthDetection = true
                                 print("🔗 showHealthDetection 设置为 true")
+                                // 重置滑动状态
+                                swipeOffset = 0
+                                isSwipeActive = false
                             } else {
                                 if demoManager.demoProfile.intimacyGrade >= 3 {
                                     print("❌ 亲密度已达到3级，禁用健康检测功能")
                                 } else {
                                     print("❌ 状态不满足条件，当前状态: \(demoManager.demoState.rawValue)")
                                 }
+                                // 重置滑动状态
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    swipeOffset = 0
+                                    isSwipeActive = false
+                                }
                             }
                         } else {
                             print("❌ 手势距离不满足条件，需要 < -80，实际: \(value.translation.width)")
+                            // 重置滑动状态
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                swipeOffset = 0
+                                isSwipeActive = false
+                            }
                         }
                     }
             )
