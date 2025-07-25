@@ -6,18 +6,20 @@
 //
 
 import SwiftUI
+import WatchKit
 
 @main
 struct ming_ling_watch_os_Watch_AppApp: App {
     @StateObject private var profileManager = UserProfileManager.shared
     @StateObject private var monitoringService = HealthMonitoringService.shared
+    @WKApplicationDelegateAdaptor var appDelegate: WatchOSAppDelegate
     
     var body: some Scene {
         WindowGroup {
             if profileManager.isProfileComplete {
                 // 用户已完成档案设置，显示主界面
                 NavigationView {
-                    NewMainDashboardView()
+                    MainPetView()
                 }
                 .navigationViewStyle(StackNavigationViewStyle())
                 .onAppear {
@@ -29,5 +31,8 @@ struct ming_ling_watch_os_Watch_AppApp: App {
                 BirthdaySelectionView()
             }
         }
+        
+        // 配置自定义通知界面
+        WKNotificationScene(controller: NotificationController.self, category: "PET_NOTIFICATION")
     }
 }

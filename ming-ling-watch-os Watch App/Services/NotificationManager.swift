@@ -11,6 +11,7 @@ class NotificationManager: ObservableObject {
     
     private init() {
         checkAuthorizationStatus()
+        setupNotificationCategories()
     }
     
     // MARK: - 检查授权状态
@@ -42,6 +43,7 @@ class NotificationManager: ObservableObject {
         content.title = getNotificationTitle(for: type)
         content.body = message
         content.sound = .default
+        content.categoryIdentifier = "PET_NOTIFICATION"
         
         // 添加自定义数据
         content.userInfo = [
@@ -189,6 +191,51 @@ class NotificationManager: ObservableObject {
             }.map { $0.identifier }
             
             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiersToRemove)
+        }
+    }
+    
+    // MARK: - 设置通知类别
+    private func setupNotificationCategories() {
+        // 创建宠物通知类别，用于 Long Look 自定义界面
+        let petCategory = UNNotificationCategory(
+            identifier: "PET_NOTIFICATION",
+            actions: [],
+            intentIdentifiers: [],
+            options: [.customDismissAction]
+        )
+        
+        // 注册通知类别
+        UNUserNotificationCenter.current().setNotificationCategories([petCategory])
+    }
+    
+    // MARK: - 发送测试通知
+    func sendTestNotification(userElement: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "宠物消息"
+        content.body = "点击查看自定义界面"
+        content.sound = .default
+        content.categoryIdentifier = "PET_NOTIFICATION"
+        
+        // 添加自定义数据
+        content.userInfo = [
+            "type": "test",
+            "userElement": userElement,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "test_notification_\(Date().timeIntervalSince1970)",
+            content: content,
+            trigger: trigger
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("Error sending test notification: \(error)")
+            } else {
+                print("Test notification sent successfully")
+            }
         }
     }
 }

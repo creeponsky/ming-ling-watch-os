@@ -35,6 +35,16 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		3D83DEFA2E3353B400609605 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3DB3730D2E32739100A91180 /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -56,6 +66,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		3D83DEEF2E3353B400609605 /* mingling-notifcation */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "mingling-notifcation";
+			sourceTree = "<group>";
+		};
 		3DB372EB2E32739000A91180 /* ming-ling-watch-os Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "ming-ling-watch-os Watch App";
@@ -104,6 +119,7 @@
 				3DB372EB2E32739000A91180 /* ming-ling-watch-os Watch App */,
 				3DB372F92E32739100A91180 /* ming-ling-watch-os Watch AppTests */,
 				3DB373032E32739100A91180 /* ming-ling-watch-os Watch AppUITests */,
+				3D83DEEF2E3353B400609605 /* mingling-notifcation */,
 				3DB372E22E32739000A91180 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -148,6 +164,7 @@
 				3DB372E32E32739000A91180 /* Sources */,
 				3DB372E42E32739000A91180 /* Frameworks */,
 				3DB372E52E32739000A91180 /* Resources */,
+				3D83DEFA2E3353B400609605 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
