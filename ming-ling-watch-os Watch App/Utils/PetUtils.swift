@@ -39,6 +39,12 @@ class PetUtils {
         }
     }
     
+    // MARK: - 获取宠物GIF动画名称
+    static func getPetGIFName(for element: String) -> String {
+        // 目前所有元素都使用同一个GIF动画
+        return "animation1"
+    }
+    
     // MARK: - 获取元素背景色
     static func getElementBackgroundColor(for element: String) -> Color {
         switch element {

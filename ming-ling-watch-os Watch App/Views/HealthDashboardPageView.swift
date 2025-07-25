@@ -7,6 +7,7 @@ struct HealthDashboardPageView: View {
     @StateObject private var healthKitManager = HealthKitManager()
     @StateObject private var environmentManager = EnvironmentSensorManager.shared
     @StateObject private var systemNotificationManager = SystemNotificationManager.shared
+    @StateObject private var gifAnimationManager = GIFAnimationManager.shared
     
     var body: some View {
         ScrollView {
@@ -16,6 +17,9 @@ struct HealthDashboardPageView: View {
                 
                 // 健康卡片
                 healthCardsSection
+                
+                // GIF通知按钮
+                gifNotificationButton
                 
                 // 系统通知按钮
                 systemNotificationButton
@@ -97,6 +101,67 @@ struct HealthDashboardPageView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - GIF通知按钮
+    private var gifNotificationButton: some View {
+        Button(action: {
+            // 显示GIF动画通知
+            showGIFNotification()
+        }) {
+            HStack(spacing: 12) {
+                GIFAnimationView(gifName: "animation1", isPlaying: true)
+                    .frame(width: 40, height: 40)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.3), lineWidth: 1)
+                    )
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("GIF动画通知")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                    
+                    Text("点击查看动画效果")
+                        .font(.caption)
+                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5))
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    // MARK: - 显示GIF通知
+    private func showGIFNotification() {
+        // 发送一个正常的健康提醒通知，但使用GIF动画
+        let element = profileManager.userProfile.fiveElements?.primary ?? "金"
+        
+        print("发送GIF动画通知 - 用户元素: \(element)")
+        
+        // 使用现有的健康提醒通知系统，但添加GIF标识
+        systemNotificationManager.sendHealthReminderNotification(
+            for: element,
+            reminderType: .sunExposure,
+            subType: "建议",
+            useGIFAnimation: true // 新增参数，标识使用GIF动画
+        )
     }
     
     // MARK: - 系统通知按钮

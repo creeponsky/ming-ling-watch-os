@@ -61,20 +61,20 @@ struct PetNotificationLongLookView: View {
             PetUtils.getElementBackgroundColor(for: userElement)
                 .ignoresSafeArea()
             
-            // 主内容区域 - 充分利用屏幕高度
+            // 主内容区域 - 只包含对话框，不受GIF影响
             VStack(spacing: 0) {
-                // 对话框 - 左上角，更大的显示区域
+                // 对话框 - 左上角，固定大小
                 HStack {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(getNotificationMessage())
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(PetUtils.getElementTextColor(for: userElement))
                             .multilineTextAlignment(.leading)
-                            .lineLimit(nil) // 不限制行数，充分利用空间
+                            .lineLimit(3)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
                             .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.95))
@@ -87,25 +87,36 @@ struct PetNotificationLongLookView: View {
                     
                     Spacer()
                 }
-                .padding(.top, 20)
-                .padding(.leading, 12)
+                .padding(.top, 4)
+                .padding(.leading, 4)
                 
                 Spacer()
-                
-                // 宠物说话图片 - 右下角，更大的尺寸
+            }
+            .frame(maxHeight: 200)
+            
+            VStack {
+                Spacer()
                 HStack {
                     Spacer()
                     
-                    Image(PetUtils.getPetSpeakImageName(for: userElement))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 120, height: 120)
-                        .offset(x: 20, y: 30)
+                    Group {
+                        if let useGIFAnimation = notificationUserInfo["useGIFAnimation"] as? Bool, useGIFAnimation {
+                            GIFAnimationView(gifName: PetUtils.getPetGIFName(for: userElement), isPlaying: true)
+                                // .frame(width: 300, height: 300)
+                                // .offset(x: 50, y: 80)
+                                .frame(width: 80, height: 80)
+                                .offset(x: 20, y: 40)
+                        } else {
+                            Image(PetUtils.getPetSpeakImageName(for: userElement))
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 80, height: 80)
+                                .offset(x: 20, y: 40)
+                        }
+                    }
                 }
-                .padding(.bottom, 20) // 给底部留出空间
             }
-            
-
+            .frame(maxWidth: .infinity, maxHeight: .infinity) // 占满整个空间
         }
         .onAppear {
             loadNotificationContent()
@@ -143,7 +154,13 @@ struct PetNotificationLongLookView: View {
         print("背景颜色: \(PetUtils.getElementBackgroundColor(for: userElement))")
         print("对话框颜色: \(PetUtils.getElementDialogColor(for: userElement))")
         print("文字颜色: \(PetUtils.getElementTextColor(for: userElement))")
-        print("图片名称: \(PetUtils.getPetSpeakImageName(for: userElement))")
+        
+        // 检查是否使用GIF动画
+        if let useGIFAnimation = notificationUserInfo["useGIFAnimation"] as? Bool, useGIFAnimation {
+            print("GIF动画名称: \(PetUtils.getPetGIFName(for: userElement))")
+        } else {
+            print("图片名称: \(PetUtils.getPetSpeakImageName(for: userElement))")
+        }
         print("==================")
     }
 } 

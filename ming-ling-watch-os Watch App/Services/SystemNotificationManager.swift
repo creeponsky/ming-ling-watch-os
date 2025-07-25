@@ -78,12 +78,12 @@ class SystemNotificationManager: NSObject, ObservableObject {
     }
     
     // MARK: - 发送健康提醒通知
-    func sendHealthReminderNotification(for element: String, reminderType: NotificationUtils.HealthReminderType, subType: String = "建议") {
-        sendHealthReminderNotificationWithDelay(for: element, reminderType: reminderType, subType: subType, delay: 1)
+    func sendHealthReminderNotification(for element: String, reminderType: NotificationUtils.HealthReminderType, subType: String = "建议", useGIFAnimation: Bool = false) {
+        sendHealthReminderNotificationWithDelay(for: element, reminderType: reminderType, subType: subType, delay: 1, useGIFAnimation: useGIFAnimation)
     }
     
     // MARK: - 发送延时健康提醒通知
-    func sendHealthReminderNotificationWithDelay(for element: String, reminderType: NotificationUtils.HealthReminderType, subType: String = "建议", delay: TimeInterval) {
+    func sendHealthReminderNotificationWithDelay(for element: String, reminderType: NotificationUtils.HealthReminderType, subType: String = "建议", delay: TimeInterval, useGIFAnimation: Bool = false) {
         let content = NotificationUtils.getHealthReminderContent(for: element, reminderType: reminderType, subType: subType)
         
         let notification = UNMutableNotificationContent()
@@ -96,7 +96,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
             "element": element,
             "reminderType": reminderType.rawValue,
             "subType": subType,
-            "type": "health_reminder"
+            "type": "health_reminder",
+            "useGIFAnimation": useGIFAnimation
         ]
         
         // 设置通知类别以启用自定义 Long Look 界面
