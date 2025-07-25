@@ -1,16 +1,15 @@
 import SwiftUI
 
 struct BirthdaySelectionView: View {
-    @StateObject private var baziService = BaziAPIService()
     @StateObject private var profileManager = UserProfileManager.shared
+    private let baziService = BaziAPIService()
     
     @State private var selectedDate = Date()
     @State private var selectedSex = 0 // 0男 1女
     @State private var showingDatePicker = false
-    @State private var showingPetRecommendation = false
     @State private var selectedFiveElements: FiveElements?
     @State private var selectedBaziData: BaziData?
-    @State private var petRecommendation: PetRecommendation?
+    @State private var error: String?
     
     var body: some View {
         ScrollView {
@@ -128,7 +127,7 @@ struct BirthdaySelectionView: View {
                 .buttonStyle(PlainButtonStyle())
                 
                 // 错误信息
-                if let error = baziService.error {
+                if let error = error {
                     Text(error)
                         .font(.caption)
                         .foregroundColor(.red)
@@ -146,7 +145,7 @@ struct BirthdaySelectionView: View {
                         VStack(spacing: 12) {
                             HStack {
                                 Circle()
-                                    .fill(Color(hex: fiveElements.color))
+                                    .fill(getElementColor(for: fiveElements.primary))
                                     .frame(width: 20, height: 20)
                                 
                                 Text(fiveElements.primary)
@@ -166,7 +165,7 @@ struct BirthdaySelectionView: View {
                                     .font(.caption)
                                     .fontWeight(.semibold)
                                 
-                                ForEach(fiveElements.healthTips, id: \.self) { tip in
+                                ForEach(getHealthTips(for: fiveElements.primary), id: \.self) { tip in
                                     HStack(alignment: .top) {
                                         Text("•")
                                             .foregroundColor(.blue)
@@ -183,34 +182,32 @@ struct BirthdaySelectionView: View {
                                 .fill(Color.gray.opacity(0.1))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color(hex: fiveElements.color).opacity(0.3), lineWidth: 1)
+                                        .stroke(getElementColor(for: fiveElements.primary).opacity(0.3), lineWidth: 1)
                                 )
                         )
                         
                         // 宠物推荐
-                        if let petRec = petRecommendation {
-                            VStack(spacing: 12) {
-                                Text("推荐宠物")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
+                        VStack(spacing: 12) {
+                            Text("推荐宠物")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            
+                            VStack(spacing: 8) {
+                                Text(getPetName(for: fiveElements.primary))
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(getElementColor(for: fiveElements.primary))
                                 
-                                VStack(spacing: 8) {
-                                    Text(petRec.pets.first ?? "")
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(Color(hex: fiveElements.color))
-                                    
-                                    Text(petRec.description)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color(hex: fiveElements.color).opacity(0.1))
-                                )
+                                Text(getPetDescription(for: fiveElements.primary))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(getElementColor(for: fiveElements.primary).opacity(0.1))
+                            )
                         }
                         
                         // 进入应用按钮
@@ -229,7 +226,7 @@ struct BirthdaySelectionView: View {
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(hex: fiveElements.color))
+                                    .fill(getElementColor(for: fiveElements.primary))
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -252,11 +249,11 @@ struct BirthdaySelectionView: View {
             await MainActor.run {
                 selectedFiveElements = fiveElements
                 selectedBaziData = baziData
-                petRecommendation = baziService.getPetRecommendation(for: fiveElements.primary)
+                error = nil
             }
-        } catch {
+        } catch let errorMessage {
             await MainActor.run {
-                baziService.error = error.localizedDescription
+                error = errorMessage.localizedDescription
             }
         }
     }
@@ -266,6 +263,78 @@ struct BirthdaySelectionView: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         return formatter.string(from: date)
+    }
+    
+    // MARK: - 获取元素颜色
+    private func getElementColor(for element: String) -> Color {
+        switch element {
+        case "金":
+            return Color(hex: "FFD700")
+        case "木":
+            return Color(hex: "228B22")
+        case "水":
+            return Color(hex: "4169E1")
+        case "火":
+            return Color(hex: "DC143C")
+        case "土":
+            return Color(hex: "8B4513")
+        default:
+            return Color.blue
+        }
+    }
+    
+    // MARK: - 获取健康建议
+    private func getHealthTips(for element: String) -> [String] {
+        switch element {
+        case "金":
+            return ["注意呼吸调理", "保持心情舒畅", "适度运动"]
+        case "木":
+            return ["保持心情舒畅", "适度运动", "注意休息"]
+        case "水":
+            return ["注意保暖", "充足睡眠", "适度饮水"]
+        case "火":
+            return ["保持心情平静", "适度运动", "注意饮食"]
+        case "土":
+            return ["注意饮食调理", "适度运动", "保持规律作息"]
+        default:
+            return ["保持健康，注意休息"]
+        }
+    }
+    
+    // MARK: - 获取宠物名称
+    private func getPetName(for element: String) -> String {
+        switch element {
+        case "金":
+            return "金金"
+        case "木":
+            return "木木"
+        case "水":
+            return "水水"
+        case "火":
+            return "火火"
+        case "土":
+            return "土土"
+        default:
+            return "土土"
+        }
+    }
+    
+    // MARK: - 获取宠物描述
+    private func getPetDescription(for element: String) -> String {
+        switch element {
+        case "金":
+            return "金属性宠物，有助于调理肺气"
+        case "木":
+            return "木属性宠物，有助于舒展肝气"
+        case "水":
+            return "水属性宠物，有助于温润肾气"
+        case "火":
+            return "火属性宠物，有助于清凉心气"
+        case "土":
+            return "土属性宠物，有助于温和脾气"
+        default:
+            return "健康助手宠物"
+        }
     }
 }
 

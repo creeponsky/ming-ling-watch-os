@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - 宠物页面
 struct PetPageView: View {
     let userElement: String
+    @StateObject private var intimacyChangeManager = IntimacyChangeManager.shared
     
     var body: some View {
         ZStack {
@@ -17,7 +18,7 @@ struct PetPageView: View {
             )
             .ignoresSafeArea()
             
-            // 宠物图片
+            // 宠物图片和亲密值通知
             VStack {
                 Spacer()
                 
@@ -27,6 +28,12 @@ struct PetPageView: View {
                     .frame(maxWidth: 200, maxHeight: 200)
                     .scaleEffect(1.0)
                     .animation(.easeInOut(duration: 0.5), value: PetUtils.getPetImageName(for: userElement))
+                
+                // 亲密值变化通知
+                if let change = intimacyChangeManager.currentChange {
+                    IntimacyChangeView(points: change.points, isPositive: change.isPositive)
+                        .transition(.opacity.combined(with: .scale))
+                }
                 
                 Spacer()
             }

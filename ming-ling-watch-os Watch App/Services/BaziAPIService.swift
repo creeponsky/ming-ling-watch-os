@@ -78,7 +78,10 @@ class BaziAPIService: ObservableObject {
         // 根据喜用神确定五行属性
         let primaryElement = determinePrimaryElement(xiyong: baziData.xiyongshen.xiyongshen)
         
-        return (FiveElements.elements[primaryElement] ?? FiveElements.elements["金"]!, baziData)
+        // 创建FiveElements实例
+        let fiveElements = createFiveElements(for: primaryElement)
+        
+        return (fiveElements, baziData)
     }
     
     // MARK: - 确定主属性
@@ -100,9 +103,52 @@ class BaziAPIService: ObservableObject {
         return "金"
     }
     
-    // MARK: - 获取宠物推荐
-    func getPetRecommendation(for element: String) -> PetRecommendation? {
-        return PetRecommendation.recommendations[element]
+    // MARK: - 创建五行属性
+    private func createFiveElements(for primaryElement: String) -> FiveElements {
+        switch primaryElement {
+        case "金":
+            return FiveElements(
+                primary: "金",
+                secondary: "水",
+                tertiary: "土",
+                description: "金主肺气，喜清润"
+            )
+        case "木":
+            return FiveElements(
+                primary: "木",
+                secondary: "火",
+                tertiary: "水",
+                description: "木主肝气，喜舒展"
+            )
+        case "水":
+            return FiveElements(
+                primary: "水",
+                secondary: "木",
+                tertiary: "金",
+                description: "水主肾气，喜温润"
+            )
+        case "火":
+            return FiveElements(
+                primary: "火",
+                secondary: "土",
+                tertiary: "木",
+                description: "火主心气，喜清凉"
+            )
+        case "土":
+            return FiveElements(
+                primary: "土",
+                secondary: "金",
+                tertiary: "火",
+                description: "土主脾气，喜温和"
+            )
+        default:
+            return FiveElements(
+                primary: "金",
+                secondary: "水",
+                tertiary: "土",
+                description: "金主肺气，喜清润"
+            )
+        }
     }
 }
 

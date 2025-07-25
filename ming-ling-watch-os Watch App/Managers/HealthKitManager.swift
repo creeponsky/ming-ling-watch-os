@@ -30,6 +30,7 @@ class HealthKitManager: ObservableObject {
     
     private var heartRateQuery: HKQuery?
     private var activeEnergyQuery: HKQuery?
+    private var hrvQuery: HKQuery?
     @Published var isUpdating = false
     
     init() {
@@ -79,30 +80,134 @@ class HealthKitManager: ObservableObject {
         isAuthorized = status == .sharingAuthorized
     }
     
-    private func startHeartRateUpdates() {
+    // MARK: - 心率监测
+    func startHeartRateMonitoring(completion: @escaping (Double) -> Void) {
         guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
         
         let query = HKAnchoredObjectQuery(type: heartRateType, predicate: nil, anchor: nil, limit: HKObjectQueryNoLimit) { [weak self] query, samples, deletedObjects, anchor, error in
-            self?.processHeartRateSamples(samples)
+            self?.processHeartRateSamples(samples, completion: completion)
         }
         
         query.updateHandler = { [weak self] query, samples, deletedObjects, anchor, error in
-            self?.processHeartRateSamples(samples)
+            self?.processHeartRateSamples(samples, completion: completion)
         }
         
         healthStore.execute(query)
         heartRateQuery = query
     }
     
-    private func processHeartRateSamples(_ samples: [HKSample]?) {
+    func stopHeartRateMonitoring() {
+        if let query = heartRateQuery {
+            healthStore.stop(query)
+            heartRateQuery = nil
+        }
+    }
+    
+    private func processHeartRateSamples(_ samples: [HKSample]?, completion: @escaping (Double) -> Void) {
         guard let heartRateSamples = samples as? [HKQuantitySample] else { return }
         
         DispatchQueue.main.async {
             if let lastSample = heartRateSamples.last {
                 let heartRateUnit = HKUnit.count().unitDivided(by: .minute())
-                self.heartRate = Int(lastSample.quantity.doubleValue(for: heartRateUnit))
+                let heartRate = lastSample.quantity.doubleValue(for: heartRateUnit)
+                self.heartRate = Int(heartRate)
+                completion(heartRate)
             }
         }
+    }
+    
+    // MARK: - HRV监测
+    func startHRVMonitoring(completion: @escaping (Double) -> Void) {
+        guard let hrvType = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else { return }
+        
+        let query = HKAnchoredObjectQuery(type: hrvType, predicate: nil, anchor: nil, limit: HKObjectQueryNoLimit) { [weak self] query, samples, deletedObjects, anchor, error in
+            self?.processHRVSamples(samples, completion: completion)
+        }
+        
+        query.updateHandler = { [weak self] query, samples, deletedObjects, anchor, error in
+            self?.processHRVSamples(samples, completion: completion)
+        }
+        
+        healthStore.execute(query)
+        hrvQuery = query
+    }
+    
+    func stopHRVMonitoring() {
+        if let query = hrvQuery {
+            healthStore.stop(query)
+            hrvQuery = nil
+        }
+    }
+    
+    private func processHRVSamples(_ samples: [HKSample]?, completion: @escaping (Double) -> Void) {
+        guard let hrvSamples = samples as? [HKQuantitySample] else { return }
+        
+        DispatchQueue.main.async {
+            if let lastSample = hrvSamples.last {
+                let hrvUnit = HKUnit.secondUnit(with: .milli)
+                let hrv = lastSample.quantity.doubleValue(for: hrvUnit)
+                self.heartRateVariability = hrv
+                completion(hrv)
+            }
+        }
+    }
+    
+    // MARK: - 获取当前HRV
+    func getCurrentHRV(completion: @escaping (Double) -> Void) {
+        guard let hrvType = HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else {
+            completion(0)
+            return
+        }
+        
+        let query = HKSampleQuery(sampleType: hrvType, predicate: nil, limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, samples, _ in
+            guard let sample = samples?.first as? HKQuantitySample else {
+                completion(0)
+                return
+            }
+            
+            let hrvUnit = HKUnit.secondUnit(with: .milli)
+            let hrv = sample.quantity.doubleValue(for: hrvUnit)
+            completion(hrv)
+        }
+        
+        healthStore.execute(query)
+    }
+    
+    // MARK: - 获取指定时间段步数
+    func getSteps(from startDate: Date, to endDate: Date, completion: @escaping (Int) -> Void) {
+        guard let stepType = HKObjectType.quantityType(forIdentifier: .stepCount) else {
+            completion(0)
+            return
+        }
+        
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        
+        let query = HKStatisticsQuery(quantityType: stepType, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, result, _ in
+            guard let result = result, let sum = result.sumQuantity() else {
+                completion(0)
+                return
+            }
+            
+            let steps = Int(sum.doubleValue(for: HKUnit.count()))
+            completion(steps)
+        }
+        
+        healthStore.execute(query)
+    }
+    
+    private func startHeartRateUpdates() {
+        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
+        
+        let query = HKAnchoredObjectQuery(type: heartRateType, predicate: nil, anchor: nil, limit: HKObjectQueryNoLimit) { [weak self] query, samples, deletedObjects, anchor, error in
+            self?.processHeartRateSamples(samples) { _ in }
+        }
+        
+        query.updateHandler = { [weak self] query, samples, deletedObjects, anchor, error in
+            self?.processHeartRateSamples(samples) { _ in }
+        }
+        
+        healthStore.execute(query)
+        heartRateQuery = query
     }
     
     private func fetchTodayData() {

@@ -10,6 +10,7 @@ class UserProfileManager: ObservableObject {
     
     private let userDefaults = UserDefaults.standard
     private let profileKey = "userProfile"
+    private let intimacyChangeManager = IntimacyChangeManager.shared
     
     private init() {
         loadProfile()
@@ -57,6 +58,45 @@ class UserProfileManager: ObservableObject {
         userDefaults.removeObject(forKey: profileKey)
     }
     
+    // MARK: - 亲密值管理
+    func addIntimacy(_ points: Int) {
+        userProfile.addIntimacy(points)
+        saveProfile()
+        
+        // 显示亲密值增加通知
+        intimacyChangeManager.showChange(points: points, isPositive: true)
+    }
+    
+    func reduceIntimacy(_ points: Int) {
+        userProfile.reduceIntimacy(points)
+        saveProfile()
+        
+        // 显示亲密值减少通知
+        intimacyChangeManager.showChange(points: points, isPositive: false)
+    }
+    
+    // MARK: - 获取主题颜色
+    func getThemeColor() -> Color {
+        guard let element = userProfile.fiveElements?.primary else {
+            return Color.blue
+        }
+        
+        switch element {
+        case "金":
+            return Color(hex: "FFD700")
+        case "木":
+            return Color(hex: "228B22")
+        case "水":
+            return Color(hex: "4169E1")
+        case "火":
+            return Color(hex: "DC143C")
+        case "土":
+            return Color(hex: "8B4513")
+        default:
+            return Color.blue
+        }
+    }
+    
     // MARK: - 获取宠物名称
     private func getPetName(for element: String) -> String {
         switch element {
@@ -71,29 +111,7 @@ class UserProfileManager: ObservableObject {
         case "土":
             return "土土"
         default:
-            return "健康助手"
-        }
-    }
-    
-    // MARK: - 获取主题颜色
-    func getThemeColor() -> Color {
-        guard let element = userProfile.fiveElements?.primary else {
-            return .blue
-        }
-        
-        switch element {
-        case "金":
-            return Color(hex: "#FFD700")
-        case "木":
-            return Color(hex: "#228B22")
-        case "水":
-            return Color(hex: "#4169E1")
-        case "火":
-            return Color(hex: "#DC143C")
-        case "土":
-            return Color(hex: "#8B4513")
-        default:
-            return .blue
+            return "土土"
         }
     }
     
@@ -130,4 +148,5 @@ class UserProfileManager: ObservableObject {
     }
 }
 
+ 
  

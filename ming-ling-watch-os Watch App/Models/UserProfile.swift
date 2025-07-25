@@ -5,115 +5,133 @@ struct UserProfile: Codable {
     var birthday: Date?
     var sex: Int = 0 // 0男 1女
     var fiveElements: FiveElements?
+    var baziData: BaziData?
     var petRecommendation: String?
     var healthStreak: Int = 0
-    var lastActiveDate: Date?
-    var baziData: BaziData?
+    var lastHealthCheck: Date?
     
-    // 计算连续健康天数
+    // 亲密值系统
+    var intimacyLevel: Int = 0 // 0-100
+    var intimacyPoints: Int = 0 // 累计积分
+    
+    // 亲密值等级
+    var intimacyGrade: Int {
+        if intimacyLevel >= 80 {
+            return 3 // 亲密
+        } else if intimacyLevel >= 50 {
+            return 2 // 友好
+        } else {
+            return 1 // 陌生
+        }
+    }
+    
+    // 亲密值等级名称
+    var intimacyGradeName: String {
+        switch intimacyGrade {
+        case 3:
+            return "亲密"
+        case 2:
+            return "友好"
+        case 1:
+            return "陌生"
+        default:
+            return "陌生"
+        }
+    }
+    
+    // 亲密值等级图标
+    var intimacyGradeIcon: String {
+        switch intimacyGrade {
+        case 3:
+            return "heart.fill"
+        case 2:
+            return "heart"
+        case 1:
+            return "heart.slash"
+        default:
+            return "heart.slash"
+        }
+    }
+    
+    // 亲密值等级颜色
+    var intimacyGradeColor: String {
+        switch intimacyGrade {
+        case 3:
+            return "#FF6B6B" // 红色
+        case 2:
+            return "#FFB347" // 橙色
+        case 1:
+            return "#87CEEB" // 蓝色
+        default:
+            return "#87CEEB"
+        }
+    }
+    
+    // 增加亲密值
+    mutating func addIntimacy(_ points: Int) {
+        intimacyPoints += points
+        intimacyLevel = min(100, intimacyLevel + points)
+    }
+    
+    // 减少亲密值
+    mutating func reduceIntimacy(_ points: Int) {
+        intimacyLevel = max(0, intimacyLevel - points)
+    }
+    
+    // 获取亲密值进度百分比
+    var intimacyProgress: Double {
+        return Double(intimacyLevel) / 100.0
+    }
+    
+    // 获取下一等级所需积分
+    var pointsToNextGrade: Int {
+        switch intimacyGrade {
+        case 1:
+            return max(0, 50 - intimacyLevel)
+        case 2:
+            return max(0, 80 - intimacyLevel)
+        case 3:
+            return 0 // 已经是最高等级
+        default:
+            return 0
+        }
+    }
+    
+    // 更新健康天数
     mutating func updateHealthStreak() {
-        let today = Date()
         let calendar = Calendar.current
+        let today = Date()
         
-        if let lastActive = lastActiveDate {
-            let daysDifference = calendar.dateComponents([.day], from: calendar.startOfDay(for: lastActive), to: calendar.startOfDay(for: today)).day ?? 0
+        if let lastCheck = lastHealthCheck {
+            let daysSinceLastCheck = calendar.dateComponents([.day], from: lastCheck, to: today).day ?? 0
             
-            if daysDifference == 1 {
+            if daysSinceLastCheck == 1 {
                 // 连续天数
                 healthStreak += 1
-            } else if daysDifference > 1 {
-                // 中断了，重置
+            } else if daysSinceLastCheck > 1 {
+                // 中断了，重置为1
                 healthStreak = 1
             }
         } else {
-            // 第一次使用
+            // 第一次检查
             healthStreak = 1
         }
         
-        lastActiveDate = today
+        lastHealthCheck = today
     }
 }
 
 // MARK: - 五行属性模型
 struct FiveElements: Codable {
-    let primary: String // 主属性：金、木、水、火、土
-    let secondary: String? // 次属性
+    let primary: String
+    let secondary: String
+    let tertiary: String
     let description: String
-    let color: String
-    let healthTips: [String]
     
-    static let elements: [String: FiveElements] = [
-        "金": FiveElements(
-            primary: "金",
-            secondary: nil,
-            description: "金主肺气，喜清润",
-            color: "#FFD700",
-            healthTips: ["注意呼吸调理", "保持心情舒畅", "适度运动"]
-        ),
-        "木": FiveElements(
-            primary: "木",
-            secondary: nil,
-            description: "木主肝气，喜舒展",
-            color: "#228B22",
-            healthTips: ["保持心情舒畅", "适度运动", "注意休息"]
-        ),
-        "水": FiveElements(
-            primary: "水",
-            secondary: nil,
-            description: "水主肾气，喜温润",
-            color: "#4169E1",
-            healthTips: ["注意保暖", "充足睡眠", "适度饮水"]
-        ),
-        "火": FiveElements(
-            primary: "火",
-            secondary: nil,
-            description: "火主心气，喜清凉",
-            color: "#DC143C",
-            healthTips: ["保持心情平静", "适度运动", "注意饮食"]
-        ),
-        "土": FiveElements(
-            primary: "土",
-            secondary: nil,
-            description: "土主脾气，喜温和",
-            color: "#8B4513",
-            healthTips: ["注意饮食调理", "适度运动", "保持规律作息"]
-        )
-    ]
-}
-
-// MARK: - 宠物推荐模型
-struct PetRecommendation: Codable {
-    let element: String
-    let pets: [String]
-    let description: String
-}
-
-extension PetRecommendation {
-    static let recommendations: [String: PetRecommendation] = [
-        "金": PetRecommendation(
-            element: "金",
-            pets: ["金鱼", "白猫", "白兔"],
-            description: "金属性宠物，有助于调理肺气"
-        ),
-        "木": PetRecommendation(
-            element: "木",
-            pets: ["绿鹦鹉", "绿蜥蜴", "绿龟"],
-            description: "木属性宠物，有助于舒展肝气"
-        ),
-        "水": PetRecommendation(
-            element: "水",
-            pets: ["蓝鱼", "蓝鸟", "海龟"],
-            description: "水属性宠物，有助于温润肾气"
-        ),
-        "火": PetRecommendation(
-            element: "火",
-            pets: ["红鸟", "红鱼", "红兔"],
-            description: "火属性宠物，有助于清凉心气"
-        ),
-        "土": PetRecommendation(
-            element: "土",
-            pets: ["黄狗", "黄猫", "仓鼠"],
-            description: "土属性宠物，有助于温和脾气"
-        )
-    ]
+    init(primary: String, secondary: String, tertiary: String, description: String) {
+        self.primary = primary
+        self.secondary = secondary
+        self.tertiary = tertiary
+        self.description = description
+    }
 } 

@@ -37,8 +37,6 @@ class SystemNotificationManager: NSObject, ObservableObject {
         UNUserNotificationCenter.current().setNotificationCategories([petCategory])
     }
     
-
-    
     // MARK: - 发送宠物通知
     func sendPetNotification(for element: String, type: NotificationUtils.NotificationType = .encouragement) {
         let content = NotificationUtils.getNotificationContent(for: element, type: type)
@@ -119,45 +117,6 @@ class SystemNotificationManager: NSObject, ObservableObject {
                 print("发送健康提醒通知失败: \(error.localizedDescription)")
             } else {
                 print("健康提醒通知已安排，\(delay)秒后发送")
-            }
-        }
-    }
-    
-    // MARK: - 发送健康提醒通知
-    func sendHealthNotification(for element: String, healthData: String) {
-        let content = NotificationUtils.getHealthNotification(for: element, healthData: healthData)
-        
-        let notification = UNMutableNotificationContent()
-        notification.title = content.title
-        notification.body = content.message
-        notification.sound = .default
-        
-        // 添加自定义数据
-        notification.userInfo = [
-            "element": element,
-            "type": "health",
-            "healthData": healthData
-        ]
-        
-        // 设置通知类别以启用自定义 Long Look 界面
-        notification.categoryIdentifier = "PET_NOTIFICATION"
-        
-        // 创建触发器（立即触发）
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-        
-        // 创建请求
-        let request = UNNotificationRequest(
-            identifier: "health-notification-\(UUID().uuidString)",
-            content: notification,
-            trigger: trigger
-        )
-        
-        // 发送通知
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("发送健康通知失败: \(error.localizedDescription)")
-            } else {
-                print("健康通知已发送")
             }
         }
     }

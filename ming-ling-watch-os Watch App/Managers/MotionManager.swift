@@ -50,6 +50,7 @@ class MotionManager: NSObject, ObservableObject {
     @Published var pedometerAverageActivePace: Double = 0
     
     private var isUpdating = false
+    private var stepCountingCallback: ((Int) -> Void)?
     
     override init() {
         super.init()
@@ -61,6 +62,40 @@ class MotionManager: NSObject, ObservableObject {
         motionManager.gyroUpdateInterval = 0.1
         motionManager.magnetometerUpdateInterval = 0.1
         motionManager.deviceMotionUpdateInterval = 0.1
+    }
+    
+    // MARK: - 步数监测
+    func startStepCounting(callback: @escaping (Int) -> Void) {
+        stepCountingCallback = callback
+        
+        guard CMPedometer.isStepCountingAvailable() else {
+            print("步数监测不可用")
+            return
+        }
+        
+        let startDate = Calendar.current.startOfDay(for: Date())
+        
+        pedometer.startUpdates(from: startDate) { [weak self] data, error in
+            guard let data = data else { return }
+            
+            DispatchQueue.main.async {
+                let steps = data.numberOfSteps.intValue
+                self?.pedometerSteps = steps
+                self?.pedometerDistance = data.distance?.doubleValue ?? 0
+                self?.pedometerFloorsAscended = data.floorsAscended?.intValue ?? 0
+                self?.pedometerFloorsDescended = data.floorsDescended?.intValue ?? 0
+                self?.pedometerCadence = data.currentCadence?.doubleValue ?? 0
+                self?.pedometerAverageActivePace = data.averageActivePace?.doubleValue ?? 0
+                
+                // 调用回调函数
+                self?.stepCountingCallback?(steps)
+            }
+        }
+    }
+    
+    func stopStepCounting() {
+        pedometer.stopUpdates()
+        stepCountingCallback = nil
     }
     
     func startUpdates() {
