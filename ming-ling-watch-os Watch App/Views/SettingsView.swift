@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var profileManager = UserProfileManager.shared
-    @StateObject private var healthKitManager = HealthKitManager()
+    @StateObject private var healthKitManager = HealthKitManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showingBirthdaySelection = false
     @State private var showingResetAlert = false
@@ -16,9 +16,6 @@ struct SettingsView: View {
                     
                     // 亲密值卡片
                     intimacyCard
-                    
-                    // 健康数据概览
-                    healthDataOverview
                     
                     // 设置选项
                     settingsOptions
@@ -259,48 +256,7 @@ struct SettingsView: View {
         )
     }
     
-    // MARK: - 健康数据概览
-    private var healthDataOverview: some View {
-        VStack(spacing: 16) {
-            Text("健康数据概览")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
-                DataCardView(
-                    title: "心率",
-                    value: "\(healthKitManager.heartRate) BPM",
-                    icon: "heart.fill",
-                    color: .red
-                )
-                
-                DataCardView(
-                    title: "心率变异性",
-                    value: "\(Int(healthKitManager.heartRateVariability))ms",
-                    icon: "waveform.path.ecg",
-                    color: .purple
-                )
-                
-                DataCardView(
-                    title: "步数",
-                    value: "\(healthKitManager.steps)",
-                    icon: "figure.walk",
-                    color: .green
-                )
-                
-                DataCardView(
-                    title: "睡眠",
-                    value: healthKitManager.sleepAnalysis,
-                    icon: "bed.double.fill",
-                    color: .blue
-                )
-            }
-        }
-    }
+
     
     // MARK: - 设置选项
     private var settingsOptions: some View {
@@ -363,17 +319,6 @@ struct SettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                // 功能测试
-                NavigationLink(destination: TestView()) {
-                    SettingsRowView(
-                        icon: "testtube.2",
-                        title: "功能测试",
-                        subtitle: "测试健康监测和亲密值系统",
-                        color: .purple
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
                 // 重置数据
                 Button(action: {
                     showingResetAlert = true
@@ -398,42 +343,7 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - 数据卡片视图
-struct DataCardView: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.headline)
-                .fontWeight(.semibold)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            
-            Text(title)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, minHeight: 60)
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
-                )
-        )
-    }
-}
+
 
 // MARK: - 设置行视图
 struct SettingsRowView: View {

@@ -6,6 +6,29 @@ struct HealthReminder: Codable, Identifiable {
     let type: ReminderType
     let trigger: TriggerCondition
     
+    var title: String {
+        return type.rawValue
+    }
+    
+    var description: String {
+        switch type {
+        case .sunExposure:
+            return "适当晒太阳有助于维生素D合成"
+        case .stress:
+            return "监测压力水平，保持心理健康"
+        case .sedentary:
+            return "久坐提醒，适时活动身体"
+        case .exercise:
+            return "运动心率监测，确保运动效果"
+        case .sleep:
+            return "睡眠质量监测，保证充足休息"
+        }
+    }
+    
+    var icon: String {
+        return type.icon
+    }
+    
     enum ReminderType: String, Codable, CaseIterable {
         case sunExposure = "晒太阳"
         case stress = "压力大"

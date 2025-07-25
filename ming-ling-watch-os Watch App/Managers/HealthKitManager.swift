@@ -9,6 +9,7 @@ import Foundation
 import HealthKit
 
 class HealthKitManager: ObservableObject {
+    static let shared = HealthKitManager()
     private let healthStore = HKHealthStore()
     
     @Published var isAuthorized = false
@@ -35,6 +36,11 @@ class HealthKitManager: ObservableObject {
     
     init() {
         checkAuthorizationStatus()
+        // 如果已经授权，立即开始获取数据
+        if isAuthorized {
+            startHeartRateUpdates()
+            fetchTodayData()
+        }
     }
     
     func requestAuthorization() {
@@ -65,19 +71,26 @@ class HealthKitManager: ObservableObject {
             DispatchQueue.main.async {
                 self?.isAuthorized = success
                 if success {
+                    print("HealthKit授权成功")
                     self?.startHeartRateUpdates()
                     self?.fetchTodayData()
+                } else {
+                    print("HealthKit授权失败: \(error?.localizedDescription ?? "未知错误")")
                 }
             }
         }
     }
     
     private func checkAuthorizationStatus() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard HKHealthStore.isHealthDataAvailable() else { 
+            print("HealthKit在此设备上不可用")
+            return 
+        }
         
         let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate)!
         let status = healthStore.authorizationStatus(for: heartRateType)
         isAuthorized = status == .sharingAuthorized
+        print("HealthKit授权状态: \(status.rawValue), 已授权: \(isAuthorized)")
     }
     
     // MARK: - 心率监测
@@ -196,8 +209,25 @@ class HealthKitManager: ObservableObject {
     }
     
     private func startHeartRateUpdates() {
-        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
+        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { 
+            print("无法获取心率数据类型")
+            return 
+        }
         
+        // 先获取最新的心率数据
+        let latestQuery = HKSampleQuery(sampleType: heartRateType, predicate: nil, limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { [weak self] _, samples, _ in
+            if let sample = samples?.first as? HKQuantitySample {
+                let heartRateUnit = HKUnit.count().unitDivided(by: .minute())
+                let heartRate = sample.quantity.doubleValue(for: heartRateUnit)
+                DispatchQueue.main.async {
+                    self?.heartRate = Int(heartRate)
+                    print("获取到最新心率: \(Int(heartRate)) BPM")
+                }
+            }
+        }
+        healthStore.execute(latestQuery)
+        
+        // 设置实时心率监测
         let query = HKAnchoredObjectQuery(type: heartRateType, predicate: nil, anchor: nil, limit: HKObjectQueryNoLimit) { [weak self] query, samples, deletedObjects, anchor, error in
             self?.processHeartRateSamples(samples) { _ in }
         }
@@ -216,15 +246,21 @@ class HealthKitManager: ObservableObject {
         let startOfDay = calendar.startOfDay(for: now)
         let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
         
+        print("开始获取今日数据，时间范围: \(startOfDay) 到 \(now)")
+        
         fetchQuantityData(for: .activeEnergyBurned, unit: .kilocalorie(), predicate: predicate) { [weak self] value in
             DispatchQueue.main.async {
                 self?.activeEnergy = value
+                print("获取到今日消耗卡路里: \(value)")
             }
         }
         
         fetchQuantityData(for: .stepCount, unit: .count(), predicate: predicate) { [weak self] value in
             DispatchQueue.main.async {
                 self?.steps = Int(value)
+                print("获取到今日步数: \(Int(value))")
+                // 强制更新UI
+                self?.objectWillChange.send()
             }
         }
         
@@ -261,6 +297,9 @@ class HealthKitManager: ObservableObject {
         fetchQuantityData(for: .restingHeartRate, unit: HKUnit.count().unitDivided(by: .minute()), predicate: predicate) { [weak self] value in
             DispatchQueue.main.async {
                 self?.restingHeartRate = Int(value)
+                print("获取到今日静息心率: \(Int(value)) BPM")
+                // 强制更新UI
+                self?.objectWillChange.send()
             }
         }
         
@@ -273,6 +312,9 @@ class HealthKitManager: ObservableObject {
         fetchQuantityData(for: .heartRateVariabilitySDNN, unit: .secondUnit(with: .milli), predicate: predicate) { [weak self] value in
             DispatchQueue.main.async {
                 self?.heartRateVariability = value
+                print("获取到今日心率变异性: \(value)ms")
+                // 强制更新UI
+                self?.objectWillChange.send()
             }
         }
         
@@ -295,10 +337,19 @@ class HealthKitManager: ObservableObject {
         }
         
         fetchSleepAnalysis(predicate: predicate)
+        
+        // 获取当前心率（不是今日平均）
+        fetchCurrentHeartRate()
+        
+        // 延迟刷新数据，确保所有数据都已获取
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.objectWillChange.send()
+        }
     }
     
     private func fetchQuantityData(for identifier: HKQuantityTypeIdentifier, unit: HKUnit, predicate: NSPredicate, completion: @escaping (Double) -> Void) {
         guard let quantityType = HKQuantityType.quantityType(forIdentifier: identifier) else {
+            print("无法获取数据类型: \(identifier)")
             completion(0)
             return
         }
@@ -314,19 +365,31 @@ class HealthKitManager: ObservableObject {
             options = .cumulativeSum
         }
         
-        let query = HKStatisticsQuery(quantityType: quantityType, quantitySamplePredicate: predicate, options: options) { _, result, _ in
+        let query = HKStatisticsQuery(quantityType: quantityType, quantitySamplePredicate: predicate, options: options) { _, result, error in
+            if let error = error {
+                print("数据查询错误 \(identifier): \(error)")
+                completion(0)
+                return
+            }
+            
             if options == .discreteAverage {
                 guard let result = result, let average = result.averageQuantity() else {
+                    print("无法获取平均值: \(identifier)")
                     completion(0)
                     return
                 }
-                completion(average.doubleValue(for: unit))
+                let value = average.doubleValue(for: unit)
+                print("获取到平均值 \(identifier): \(value)")
+                completion(value)
             } else {
                 guard let result = result, let sum = result.sumQuantity() else {
+                    print("无法获取累积值: \(identifier)")
                     completion(0)
                     return
                 }
-                completion(sum.doubleValue(for: unit))
+                let value = sum.doubleValue(for: unit)
+                print("获取到累积值 \(identifier): \(value)")
+                completion(value)
             }
         }
         
@@ -334,23 +397,85 @@ class HealthKitManager: ObservableObject {
     }
     
     private func fetchSleepAnalysis(predicate: NSPredicate) {
-        guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return }
+        guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { 
+            print("无法获取睡眠数据类型")
+            DispatchQueue.main.async {
+                self.sleepAnalysis = "暂无数据"
+            }
+            return 
+        }
         
-        let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { [weak self] _, samples, _ in
-            guard let sleepSamples = samples as? [HKCategorySample] else { return }
+        print("开始查询睡眠数据...")
+        
+        let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { [weak self] _, samples, error in
+            if let error = error {
+                print("睡眠数据查询错误: \(error)")
+                DispatchQueue.main.async {
+                    self?.sleepAnalysis = "查询错误"
+                }
+                return
+            }
+            
+            print("睡眠数据查询完成，样本数量: \(samples?.count ?? 0)")
+            
+            guard let sleepSamples = samples as? [HKCategorySample], !sleepSamples.isEmpty else {
+                print("没有找到睡眠数据样本")
+                DispatchQueue.main.async {
+                    self?.sleepAnalysis = "暂无数据"
+                }
+                return
+            }
+            
+            print("找到 \(sleepSamples.count) 个睡眠样本")
             
             var totalSleepTime: TimeInterval = 0
             for sample in sleepSamples {
+                print("睡眠样本: \(sample.startDate) - \(sample.endDate), 类型: \(sample.value)")
                 if sample.value == HKCategoryValueSleepAnalysis.inBed.rawValue || sample.value == HKCategoryValueSleepAnalysis.asleep.rawValue {
-                    totalSleepTime += sample.endDate.timeIntervalSince(sample.startDate)
+                    let duration = sample.endDate.timeIntervalSince(sample.startDate)
+                    totalSleepTime += duration
+                    print("添加睡眠时间: \(duration/3600) 小时")
                 }
             }
             
             let hours = Int(totalSleepTime / 3600)
             let minutes = Int((totalSleepTime.truncatingRemainder(dividingBy: 3600)) / 60)
             
+            print("总睡眠时间: \(totalSleepTime/3600) 小时, 格式化: \(hours)h \(minutes)m")
+            
             DispatchQueue.main.async {
-                self?.sleepAnalysis = "\(hours)h \(minutes)m"
+                if totalSleepTime > 0 {
+                    self?.sleepAnalysis = "\(hours)h \(minutes)m"
+                } else {
+                    self?.sleepAnalysis = "暂无数据"
+                }
+                // 强制更新UI
+                self?.objectWillChange.send()
+            }
+        }
+        
+        healthStore.execute(query)
+    }
+    
+    // MARK: - 获取当前心率
+    private func fetchCurrentHeartRate() {
+        guard let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) else { 
+            print("无法获取心率数据类型")
+            return 
+        }
+        
+        let query = HKSampleQuery(sampleType: heartRateType, predicate: nil, limit: 1, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { [weak self] _, samples, _ in
+            if let sample = samples?.first as? HKQuantitySample {
+                let heartRateUnit = HKUnit.count().unitDivided(by: .minute())
+                let heartRate = sample.quantity.doubleValue(for: heartRateUnit)
+                DispatchQueue.main.async {
+                    self?.heartRate = Int(heartRate)
+                    print("获取到当前心率: \(Int(heartRate)) BPM")
+                    // 强制更新UI
+                    self?.objectWillChange.send()
+                }
+            } else {
+                print("未找到心率数据")
             }
         }
         

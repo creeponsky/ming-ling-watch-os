@@ -4,7 +4,7 @@ import UserNotifications
 // MARK: - 健康数据页面
 struct HealthDashboardPageView: View {
     @StateObject private var profileManager = UserProfileManager.shared
-    @StateObject private var healthKitManager = HealthKitManager()
+    @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var environmentManager = EnvironmentSensorManager.shared
     @StateObject private var systemNotificationManager = SystemNotificationManager.shared
     @StateObject private var gifAnimationManager = GIFAnimationManager.shared
@@ -25,15 +25,24 @@ struct HealthDashboardPageView: View {
                 
                 // 设置入口
                 settingsSection
+                
+                // 添加底部间距确保可以滚动到底部
+                Spacer(minLength: 20)
             }
             .padding()
         }
+        .scrollIndicators(.hidden)
         .background(PetUtils.getElementBackgroundColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
         .onAppear {
             healthKitManager.requestAuthorization()
             profileManager.updateHealthStreak()
             // 设置通知代理
             UNUserNotificationCenter.current().delegate = systemNotificationManager
+            
+            // 延迟刷新数据，确保授权完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                healthKitManager.objectWillChange.send()
+            }
         }
     }
     
@@ -90,12 +99,22 @@ struct HealthDashboardPageView: View {
                 GridItem(.flexible())
             ], spacing: 12) {
                 ForEach(HealthReminder.allReminders, id: \.id) { reminder in
-                    HealthCardView(
-                        reminder: reminder,
-                        healthData: getHealthData(for: reminder.type),
+                    NavigationLink(destination: HealthDetailView(
+                        reminder: reminder, 
                         userElement: profileManager.userProfile.fiveElements?.primary ?? "金",
-                        isDarkMode: true
-                    )
+                        healthData: getHealthData(for: reminder.type)
+                    )) {
+                        HealthCardView(
+                            reminder: reminder,
+                            healthData: getHealthData(for: reminder.type),
+                            userElement: profileManager.userProfile.fiveElements?.primary ?? "金",
+                            isDarkMode: true
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .onTapGesture {
+                        print("点击了健康卡片: \(reminder.type.rawValue)")
+                    }
                 }
             }
         }
@@ -245,11 +264,13 @@ struct HealthDashboardPageView: View {
         case .sunExposure:
             return "紫外线: \(environmentManager.getUVStatus())"
         case .stress:
-            return "心率变异性: \(Int(healthKitManager.heartRateVariability))ms"
+            let hrv = Int(healthKitManager.heartRateVariability)
+            return hrv > 0 ? "\(hrv)ms" : "暂无数据"
         case .sedentary:
-            return "步数: \(healthKitManager.steps)"
+            return "\(healthKitManager.steps) 步"
         case .exercise:
-            return "心率: \(healthKitManager.heartRate) BPM"
+            let hr = healthKitManager.heartRate
+            return hr > 0 ? "\(hr) BPM" : "暂无数据"
         case .sleep:
             return healthKitManager.sleepAnalysis
         }
