@@ -54,8 +54,28 @@ class PetUtils {
             gifNumber = 1
         }
         
-        // 暂时所有五行都使用mumu
+        // 如果是木属性，使用idle状态的GIF
+        if element == "木" {
+            return "GIFs/mumu/idle/\(gifNumber)"
+        }
+        
+        // 其他五行暂时也使用mumu的happy动画
         return "GIFs/mumu/happy/\(gifNumber)"
+    }
+    
+    // MARK: - 获取mumu idle状态的GIF名称
+    static func getMumuIdleGIFName(intimacyGrade: Int) -> String {
+        let gifNumber: Int
+        switch intimacyGrade {
+        case 2:
+            gifNumber = 1 // 友好等级使用1.gif
+        case 3:
+            gifNumber = 2 // 亲密等级使用2.gif
+        default:
+            gifNumber = 1 // 默认使用1.gif
+        }
+        
+        return "GIFs/mumu/idle/\(gifNumber)-idle"
     }
     
     // MARK: - 获取宠物图片名称（根据亲密度）
