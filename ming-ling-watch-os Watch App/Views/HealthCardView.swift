@@ -5,30 +5,28 @@ struct HealthCardView: View {
     let reminder: HealthReminder
     let healthData: String
     let userElement: String
-    let isDarkMode: Bool
     
-    init(reminder: HealthReminder, healthData: String, userElement: String, isDarkMode: Bool = false) {
+    init(reminder: HealthReminder, healthData: String, userElement: String) {
         self.reminder = reminder
         self.healthData = healthData
         self.userElement = userElement
-        self.isDarkMode = isDarkMode
     }
     
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: reminder.type.icon)
                 .font(.title2)
-                .foregroundColor(Color(hex: reminder.type.color))
+                .foregroundColor(PetUtils.getElementDialogColor(for: userElement))
             
             Text(reminder.type.rawValue)
                 .font(.headline)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-                .foregroundColor(isDarkMode ? .white : .primary)
+                .foregroundColor(PetUtils.getElementTextColor(for: userElement))
             
             Text(healthData)
                 .font(.caption2)
-                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                .foregroundColor(PetUtils.getElementTextColor(for: userElement).opacity(0.7))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
         }
@@ -36,10 +34,10 @@ struct HealthCardView: View {
         .padding(8)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isDarkMode ? Color.gray.opacity(0.2) : Color.gray.opacity(0.1))
+                .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.2))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(hex: reminder.type.color).opacity(isDarkMode ? 0.5 : 0.3), lineWidth: 1)
+                        .stroke(PetUtils.getElementDialogColor(for: userElement).opacity(0.5), lineWidth: 1)
                 )
         )
         .contentShape(Rectangle())
@@ -53,15 +51,13 @@ struct HealthCardView_Previews: PreviewProvider {
             HealthCardView(
                 reminder: HealthReminder.allReminders[0],
                 healthData: "测试数据",
-                userElement: "金",
-                isDarkMode: false
+                userElement: "金"
             )
             
             HealthCardView(
                 reminder: HealthReminder.allReminders[1],
                 healthData: "测试数据",
-                userElement: "木",
-                isDarkMode: true
+                userElement: "木"
             )
         }
         .padding()

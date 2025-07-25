@@ -15,6 +15,9 @@ struct HealthDashboardPageView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // Demo模块 - 移到最前面
+                demoSection
+                
                 // 问候语和压力状态
                 greetingSection
                 
@@ -23,9 +26,6 @@ struct HealthDashboardPageView: View {
                 
                 // 通知测试模块
                 notificationTestSection
-                
-                // Demo模块
-                demoSection
                 
                 // 设置入口
                 settingsSection
@@ -92,7 +92,7 @@ struct HealthDashboardPageView: View {
     // MARK: - 健康卡片区域
     private var healthCardsSection: some View {
         VStack(spacing: 16) {
-            Text("今日健康监测11")
+            Text("今日健康监测")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -111,8 +111,7 @@ struct HealthDashboardPageView: View {
                         HealthCardView(
                             reminder: reminder,
                             healthData: getHealthData(for: reminder.type),
-                            userElement: profileManager.userProfile.fiveElements?.primary ?? "金",
-                            isDarkMode: true
+                            userElement: profileManager.userProfile.fiveElements?.primary ?? "金"
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -285,7 +284,7 @@ struct HealthDashboardPageView: View {
                             
                             Text(demoManager.isDemo ? "重新开始Demo流程" : "体验完整功能演示")
                                 .font(.caption)
-                                .foregroundColor(demoManager.isDemo ? PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7) : .white.opacity(0.9))
+                                .foregroundColor(demoManager.isDemo ? PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7) : .blue.opacity(0.9))
                         }
                         
                         Spacer()

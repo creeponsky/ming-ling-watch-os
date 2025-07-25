@@ -1,113 +1,147 @@
 import SwiftUI
 
+// MARK: - 进化阶段枚举
+enum EvolutionPhase {
+    case initial      // 初始状态
+    case fadeOut      // 2级图片淡出
+    case gifFadeIn    // GIF淡入（暂停）
+    case playing      // GIF播放
+    case gifFadeOut   // GIF淡出
+    case finalFadeIn  // 3级UI淡入
+}
+
 // MARK: - Demo主宠物视图
 struct DemoMainPetView: View {
     @StateObject private var demoManager = DemoManager.shared
     @StateObject private var gifAnimationManager = GIFAnimationManager.shared
-    @State private var dragOffset: CGFloat = 0
     @State private var showUpgradeAnimation = false
     @State private var isPlayingUpgradeGIF = false
     @State private var showInteractionAnimation = false
+    @State private var showHealthDetection = false
+    @State private var showVoiceCompleted = false
+    @State private var showEvolutionAnimation = false
+    @State private var evolutionPhase: EvolutionPhase = .initial
+    @State private var swipeOffset: CGFloat = 0
+    @State private var isSwipeActive = false
     
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                // 背景渐变 - 木属性主题
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.green.opacity(0.3),
-                        Color.black
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                
-                VStack {
-                    // 通知栏
-                    if demoManager.showNotificationBar {
-                        notificationBar
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                    
-                    Spacer()
+                ZStack {
+                    // 背景渐变 - 木属性主题
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.green.opacity(0.3),
+                            Color.black
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
                     
                     // 主内容区域
-                    mainContentArea
-                    
-                    Spacer()
-                    
-                    // 底部控制区域
-                    bottomControlArea
-                }
-                
-                // 上滑健康检测面板
-                if dragOffset < -50 {
-                    healthDetectionPanel
-                        .offset(y: max(0, 100 + dragOffset))
-                        .transition(.move(edge: .bottom))
-                }
-            }
-        }
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    dragOffset = value.translation.y
-                }
-                .onEnded { value in
-                    if value.translation.y < -100 {
-                        // 上滑超过阈值，显示健康检测面板
-                        withAnimation(.spring()) {
-                            dragOffset = -200
+                    VStack {
+                        Spacer()
+                        
+                        // 主内容区域（在欢迎状态时隐藏）
+                        if !demoManager.showNotificationBar || demoManager.demoState != .mainPage {
+                            mainContentArea
                         }
-                    } else {
-                        // 回弹
-                        withAnimation(.spring()) {
-                            dragOffset = 0
-                        }
+                        
+                        Spacer()
+                        
+                        // 底部控制区域
+                        bottomControlArea
+                    }
+                    .offset(x: demoManager.demoProfile.intimacyGrade < 3 ? swipeOffset : 0)
+                    .opacity(demoManager.demoProfile.intimacyGrade < 3 ? (1.0 - abs(swipeOffset) / 200.0) : 1.0)
+                    
+                    // 健康检测页面预览（左滑时显示）
+                    if isSwipeActive && swipeOffset < -50 && demoManager.demoProfile.intimacyGrade < 3 {
+                        DemoHealthDetectionView()
+                            .offset(x: geometry.size.width + swipeOffset)
+                            .opacity(abs(swipeOffset) / 200.0)
+                    }
+                    
+                    // 全屏欢迎对话框
+                    if demoManager.showNotificationBar && demoManager.demoState == .mainPage {
+                        welcomeOverlay
+                            .zIndex(1000) // 确保在最上层
                     }
                 }
-        )
-        .onAppear {
-            setupDemoState()
-        }
-        .onChange(of: demoManager.demoState) { newState in
-            handleStateChange(newState)
-        }
-    }
-    
-    // MARK: - 通知栏
-    private var notificationBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "bell.fill")
-                .foregroundColor(.orange)
-                .font(.caption)
-            
-            Text(demoManager.notificationMessage)
-                .font(.caption2)
-                .foregroundColor(.white)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-            
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.7))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.green.opacity(0.5), lineWidth: 1)
-                )
-        )
-        .padding(.horizontal)
+            }
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        // 只处理左滑手势，且亲密度小于3级
+                        if value.translation.width < 0 && demoManager.demoProfile.intimacyGrade < 3 {
+                            isSwipeActive = true
+                            swipeOffset = value.translation.width
+                            print("🔄 左滑手势: translation.width = \(value.translation.width)")
+                        }
+                    }
+                    .onEnded { value in
+                        print("🔄 手势结束: translation.width = \(value.translation.width), 当前状态 = \(demoManager.demoState.rawValue)")
+                        
+                        // 重置滑动状态
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            swipeOffset = 0
+                            isSwipeActive = false
+                        }
+                        
+                        if value.translation.width < -80 {
+                            print("✅ 手势距离满足条件")
+                            
+                            // 如果在欢迎状态，先关闭欢迎对话框
+                            if demoManager.showNotificationBar && demoManager.demoState == .mainPage {
+                                print("👋 关闭欢迎对话框")
+                                dismissWelcome()
+                            } else if (demoManager.demoState == .mainPage || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) && demoManager.demoProfile.intimacyGrade < 3 {
+                                print("✅ 状态满足条件，触发页面跳转")
+                                showHealthDetection = true
+                                print("🔗 showHealthDetection 设置为 true")
+                            } else {
+                                if demoManager.demoProfile.intimacyGrade >= 3 {
+                                    print("❌ 亲密度已达到3级，禁用健康检测功能")
+                                } else {
+                                    print("❌ 状态不满足条件，当前状态: \(demoManager.demoState.rawValue)")
+                                }
+                            }
+                        } else {
+                            print("❌ 手势距离不满足条件，需要 < -80，实际: \(value.translation.width)")
+                        }
+                    }
+            )
+            .onAppear {
+                setupDemoState()
+                print("🎬 DemoMainPetView 出现 - 当前状态: \(demoManager.demoState.rawValue)")
+            }
+            .onChange(of: demoManager.demoState) { newState in
+                handleStateChange(newState)
+            }
+            .navigationDestination(isPresented: $showHealthDetection) {
+                DemoHealthDetectionView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
+            }
+            .onChange(of: showHealthDetection) { newValue in
+                print("🔗 showHealthDetection 变化: \(newValue)")
+            }
+            .navigationDestination(isPresented: $showVoiceCompleted) {
+                DemoVoiceCompletedView()
+            }
+        .navigationBarHidden(true)
+        .navigationBarBackButtonHidden(true)
     }
     
     // MARK: - 主内容区域
     private var mainContentArea: some View {
         VStack {
-            if showUpgradeAnimation && isPlayingUpgradeGIF {
+            if showEvolutionAnimation {
+                // 进化动画
+                evolutionAnimationView
+            } else if showUpgradeAnimation && isPlayingUpgradeGIF {
                 // 升级动画
                 upgradeAnimationView
             } else {
@@ -142,17 +176,82 @@ struct DemoMainPetView: View {
                             triggerInteractionAnimation()
                         }
                     }
+                    .allowsHitTesting(demoManager.demoState == .voiceInteraction)
             }
             
-            // 亲密度显示
-            intimacyDisplayView
+            // 亲密度显示（在进化动画时隐藏）
+            if !showEvolutionAnimation {
+                intimacyDisplayView
+                    .opacity(1.0)
+                    .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
+            }
+        }
+    }
+    
+    // MARK: - 进化动画视图
+    private var evolutionAnimationView: some View {
+        ZStack {
+            // 2级宠物图片（淡出阶段）
+            if evolutionPhase == .initial || evolutionPhase == .fadeOut {
+                VStack {
+                    Image("mumu")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 150, height: 150)
+                        .opacity(evolutionPhase == .initial ? 1.0 : 0.0)
+                        .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
+                    
+                    // 2级亲密度显示
+                    HStack {
+                        ForEach(1...3, id: \.self) { level in
+                            Image(systemName: level <= 2 ? "heart.fill" : "heart")
+                                .foregroundColor(level <= 2 ? .red : .gray)
+                                .font(.caption)
+                        }
+                    }
+                    .opacity(evolutionPhase == .initial ? 1.0 : 0.0)
+                    .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
+                }
+            }
+            
+            // 进化GIF（淡入、播放、淡出阶段）
+            if evolutionPhase == .gifFadeIn || evolutionPhase == .playing || evolutionPhase == .gifFadeOut {
+                GIFAnimationView(gifName: "GIFs/mumu/grow/2-3", isPlaying: evolutionPhase == .playing)
+                    .frame(width: 200, height: 200)
+                    .offset(y: -20) // 往上移动20点
+                    .opacity(evolutionPhase == .gifFadeOut ? 0.0 : 1.0)
+                    .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
+            }
+            
+            // 3级宠物图片（最终淡入阶段）
+            if evolutionPhase == .finalFadeIn {
+                VStack {
+                    Image("mumu")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 150, height: 150)
+                        .opacity(1.0)
+                        .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
+                    
+                    // 3级亲密度显示
+                    HStack {
+                        ForEach(1...3, id: \.self) { level in
+                            Image(systemName: level <= 3 ? "heart.fill" : "heart")
+                                .foregroundColor(level <= 3 ? .red : .gray)
+                                .font(.caption)
+                        }
+                    }
+                    .opacity(1.0)
+                    .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
+                }
+            }
         }
     }
     
     // MARK: - 升级动画视图
     private var upgradeAnimationView: some View {
         VStack {
-            GIFAnimationView(gifName: "GIFs/mumu/happy/1")
+            GIFAnimationView(gifName: "GIFs/mumu/grow/2-3", isPlaying: isPlayingUpgradeGIF)
                 .frame(width: 150, height: 150)
             
             Text("🎉 亲密度升级！")
@@ -166,18 +265,12 @@ struct DemoMainPetView: View {
     
     // MARK: - 亲密度显示
     private var intimacyDisplayView: some View {
-        VStack(spacing: 4) {
-            HStack {
-                ForEach(1...3, id: \.self) { level in
-                    Image(systemName: level <= demoManager.demoProfile.intimacyGrade ? "heart.fill" : "heart")
-                        .foregroundColor(level <= demoManager.demoProfile.intimacyGrade ? .red : .gray)
-                        .font(.caption)
-                }
+        HStack {
+            ForEach(1...3, id: \.self) { level in
+                Image(systemName: level <= demoManager.demoProfile.intimacyGrade ? "heart.fill" : "heart")
+                    .foregroundColor(level <= demoManager.demoProfile.intimacyGrade ? .red : .gray)
+                    .font(.caption)
             }
-            
-            Text("等级 \(demoManager.demoProfile.intimacyGrade)")
-                .font(.caption2)
-                .foregroundColor(.white.opacity(0.7))
         }
     }
     
@@ -187,12 +280,21 @@ struct DemoMainPetView: View {
             Spacer()
             
             // 语音录音按钮
-            if demoManager.demoState == .voiceInteraction {
+            if demoManager.demoState == .voiceInteraction && !showEvolutionAnimation {
                 voiceRecordingButton
+                    .opacity(1.0)
+                    .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
+            }
+            
+            // 语音完成阶段的按钮
+            if demoManager.demoState == .voiceCompleted && !showEvolutionAnimation {
+                voiceCompletedButtons
+                    .opacity(1.0)
+                    .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
             }
             
             // 退出按钮
-            if demoManager.canExitDemo {
+            if demoManager.canExitDemo && demoManager.demoState != .voiceCompleted && !showEvolutionAnimation {
                 Button(action: {
                     demoManager.exitDemo()
                 }) {
@@ -211,6 +313,8 @@ struct DemoMainPetView: View {
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
+                .opacity(1.0)
+                .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
             }
         }
         .padding(.horizontal)
@@ -235,108 +339,58 @@ struct DemoMainPetView: View {
         .disabled(!demoManager.canExitDemo)
     }
     
-    // MARK: - 健康检测面板
-    private var healthDetectionPanel: some View {
-        VStack(spacing: 16) {
-            // 标题和退出按钮
-            HStack {
-                Text("健康检测")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.green)
-                
-                Spacer()
-                
-                // 退出Demo按钮
-                Button(action: {
-                    demoManager.exitDemo()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.caption)
-                        Text("退出Demo")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(.red)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.red.opacity(0.1))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            
-            // 开始久坐检测按钮
+    // MARK: - 语音完成阶段按钮
+    private var voiceCompletedButtons: some View {
+        HStack(spacing: 12) {
+            // 继续互动按钮
             Button(action: {
-                demoManager.triggerSedentaryDetection()
-                withAnimation(.spring()) {
-                    dragOffset = 0
-                }
+                // 重置到语音交互状态
+                demoManager.demoState = .voiceInteraction
             }) {
-                VStack(spacing: 8) {
-                    Image(systemName: "figure.walk")
-                        .font(.title)
-                        .foregroundColor(.green)
+                VStack(spacing: 4) {
+                    Image(systemName: "heart.fill")
+                        .font(.title2)
+                        .foregroundColor(.red)
                     
-                    Text("开始久坐检测")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                    
-                    Text("10秒后触发提醒")
+                    Text("继续")
                         .font(.caption2)
-                        .foregroundColor(.green.opacity(0.7))
+                        .foregroundColor(.red)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 80)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.green.opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.green.opacity(0.5), lineWidth: 1)
-                        )
-                )
             }
             .buttonStyle(PlainButtonStyle())
-            .disabled(demoManager.demoState != .mainPage)
             
-            // Demo状态信息
-            VStack(spacing: 4) {
-                Text("当前Demo阶段")
-                    .font(.caption2)
-                    .foregroundColor(.green.opacity(0.7))
-                
-                Text(demoManager.stateDescription)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.green)
+            // 退出Demo按钮
+            Button(action: {
+                demoManager.exitDemo()
+            }) {
+                VStack(spacing: 4) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.red)
+                    
+                    Text("退出")
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                }
             }
+            .buttonStyle(PlainButtonStyle())
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.green.opacity(0.5), lineWidth: 1)
-                )
-        )
-        .padding(.horizontal)
     }
     
     // MARK: - 设置Demo状态
     private func setupDemoState() {
-        // 确保在主页面状态时显示通知栏
-        if demoManager.demoState == .mainPage && !demoManager.showNotificationBar {
-            demoManager.showNotificationBar = true
-            demoManager.notificationMessage = "Hello，我是木木；今天是你坚持健康的1天"
+        // 检查是否需要播放进化动画
+        if demoManager.shouldPlayEvolutionAnimation && demoManager.demoProfile.intimacyGrade >= 3 {
+            print("🎬 检测到需要播放进化动画")
+            startEvolutionAnimation()
+            demoManager.shouldPlayEvolutionAnimation = false
+            demoManager.saveDemoData()
+        }
+        
+        // 标记已显示欢迎对话框（由setBirthday方法控制显示时机）
+        if demoManager.demoState == .mainPage && !demoManager.hasShownWelcome {
+            demoManager.hasShownWelcome = true
+            demoManager.saveDemoData() // 保存状态
         }
     }
     
@@ -344,29 +398,162 @@ struct DemoMainPetView: View {
     private func handleStateChange(_ newState: DemoState) {
         switch newState {
         case .intimacyUpgrade:
-            showUpgradeAnimation()
+            startUpgradeAnimation()
         case .voiceInteraction:
             // 隐藏通知栏
             withAnimation {
                 demoManager.showNotificationBar = false
             }
+        case .voiceCompleted:
+            // 显示语音完成页面
+            showVoiceCompleted = true
         default:
             break
         }
     }
     
-    // MARK: - 显示升级动画
-    private func showUpgradeAnimation() {
-        showUpgradeAnimation = true
-        isPlayingUpgradeGIF = true
+    // MARK: - 开始进化动画
+    private func startEvolutionAnimation() {
+        print("🎬 开始进化动画流程")
+        showEvolutionAnimation = true
+        evolutionPhase = .initial
         
-        // 3秒后隐藏升级动画
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            withAnimation {
-                showUpgradeAnimation = false
-                isPlayingUpgradeGIF = false
+        // 1秒后开始淡出2级图片
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            evolutionPhase = .fadeOut
+            print("🎬 2级图片开始淡出")
+            
+            // 1秒后GIF淡入（暂停状态）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                evolutionPhase = .gifFadeIn
+                print("🎬 GIF开始淡入（暂停状态）")
+                
+                // 2秒后开始播放GIF
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    evolutionPhase = .playing
+                    print("🎬 开始播放进化GIF")
+                    
+                    // 假设GIF播放时间为2秒，然后淡出
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        evolutionPhase = .gifFadeOut
+                        print("🎬 GIF开始淡出")
+                        
+                        // 1秒后显示3级UI
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            evolutionPhase = .finalFadeIn
+                            print("🎬 3级UI开始淡入")
+                            
+                            // 1秒后结束动画
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    showEvolutionAnimation = false
+                                }
+                                print("🎬 进化动画结束，按钮开始淡入")
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+    
+    // MARK: - 显示升级动画
+    private func startUpgradeAnimation() {
+        showUpgradeAnimation = true
+        isPlayingUpgradeGIF = false // 初始不播放
+        
+        // 1秒后开始播放GIF
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            isPlayingUpgradeGIF = true
+            print("🎬 开始播放升级GIF动画")
+            
+            // 假设GIF播放时间为2秒，然后暂停
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                isPlayingUpgradeGIF = false
+                print("🎬 升级GIF动画播放完成，暂停")
+                
+                // 再等待5秒后隐藏整个升级动画
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    withAnimation {
+                        showUpgradeAnimation = false
+                    }
+                    print("🎬 升级动画结束，进入语音交互阶段")
+                }
+            }
+        }
+    }
+    
+    // MARK: - 全屏欢迎对话框
+    private var welcomeOverlay: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // 半透明背景
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        dismissWelcome()
+                    }
+                
+                // 主容器 - 全屏布局
+                ZStack {
+                    // 对话框 - 左上角
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Hello，我是木木")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.leading)
+                        
+                        Text("今天是你坚持健康的\(demoManager.demoProfile.healthStreak)天")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(width: 130, height: 70, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.green.opacity(0.95))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.green, lineWidth: 1.5)
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+                    .position(x: 80, y: 60)
+                    .scaleEffect(demoManager.showNotificationBar ? 1.0 : 0.8)
+                    .opacity(demoManager.showNotificationBar ? 1.0 : 0.0)
+                    
+                    // 宠物说话图片 - 右下角，部分超出屏幕边界
+                    Image("mumu_speak")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 160, height: 160)
+                        .position(x: geometry.size.width - 40, y: geometry.size.height - 40)
+                        .scaleEffect(demoManager.showNotificationBar ? 1.0 : 0.8)
+                        .opacity(demoManager.showNotificationBar ? 1.0 : 0.0)
+                }
+            }
+        }
+        .transition(.asymmetric(
+            insertion: .opacity.combined(with: .scale),
+            removal: .opacity.combined(with: .scale)
+        ))
+        .animation(.easeInOut(duration: 0.8), value: demoManager.showNotificationBar)
+    }
+    
+    // MARK: - 上滑提示（已移除）
+    private var upSwipeHint: some View {
+        EmptyView()
+    }
+    
+    // MARK: - 关闭欢迎对话框
+    private func dismissWelcome() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            demoManager.showNotificationBar = false
+        }
+        print("👋 欢迎对话框已关闭")
     }
     
     // MARK: - 触发交互动画

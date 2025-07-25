@@ -29,6 +29,8 @@ struct DemoBirthdaySelectionView: View {
         .background(Color.green.opacity(0.1)) // 木属性主题
         .navigationTitle("Demo设置")
         .navigationBarTitleDisplayMode(.inline)
+        .opacity(1.0)
+        .animation(.easeInOut(duration: 0.5), value: true)
     }
     
     // MARK: - 标题部分
@@ -140,6 +142,7 @@ struct DemoBirthdaySelectionView: View {
             )
             .datePickerStyle(WheelDatePickerStyle())
             .labelsHidden()
+            .frame(height: 120)
         }
     }
     

@@ -11,6 +11,7 @@ enum DemoState: String, CaseIterable, Codable {
     case stepDetection = "step_detection"         // 步数检测阶段
     case intimacyUpgrade = "intimacy_upgrade"     // 亲密度升级阶段
     case voiceInteraction = "voice_interaction"   // 语音交互阶段
+    case voiceCompleted = "voice_completed"       // 语音完成阶段
     case completed = "completed"                  // demo完成
 }
 
@@ -50,6 +51,8 @@ class DemoManager: ObservableObject {
     @Published var notificationMessage: String = ""
     @Published var stepCountBeforeReminder: Int = 0
     @Published var isRecording: Bool = false
+    @Published var hasShownWelcome: Bool = false
+    @Published var shouldPlayEvolutionAnimation: Bool = false
     
     private let demoKey = "demoData"
     private let userDefaults = UserDefaults.standard
@@ -64,6 +67,7 @@ class DemoManager: ObservableObject {
         demoState = .birthdaySelection
         demoProfile = DemoUserProfile()
         showNotificationBar = false
+        hasShownWelcome = false
         saveDemoData()
         print("🎬 Demo开始: 进入生日选择阶段")
     }
@@ -75,6 +79,7 @@ class DemoManager: ObservableObject {
         demoProfile = DemoUserProfile()
         showNotificationBar = false
         isRecording = false
+        hasShownWelcome = false
         clearDemoData()
         print("🎬 Demo结束")
     }
@@ -91,12 +96,20 @@ class DemoManager: ObservableObject {
         demoProfile.sex = sex
         demoState = .mainPage
         
-        // 设置通知栏消息
-        showNotificationBar = true
+        // 先不显示通知栏，等页面切换完成后再显示
+        showNotificationBar = false
         notificationMessage = "Hello，我是木木；今天是你坚持健康的1天"
         
         saveDemoData()
         print("🎬 Demo: 设置生日完成，进入主页面")
+        
+        // 延迟显示欢迎界面，确保页面切换动画完成
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation(.easeInOut(duration: 0.8)) {
+                self.showNotificationBar = true
+            }
+            print("🎬 Demo: 显示欢迎界面")
+        }
     }
     
     // MARK: - 触发久坐检测
@@ -115,38 +128,45 @@ class DemoManager: ObservableObject {
     // MARK: - 进入步数检测
     private func enterStepDetection() {
         demoState = .stepDetection
+        showNotificationBar = false // 隐藏欢迎对话框
         saveDemoData()
         print("🎬 Demo: 进入步数检测阶段")
         
         // 发送久坐提醒通知
         sendSedentaryReminder()
         
-        // 30秒后自动完成步数（Demo加速）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
-            self.completeStepGoal()
+        // 10秒后自动完成步数目标（模拟用户走路）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+            self.triggerIntimacyUpgrade()
         }
     }
     
-    // MARK: - 完成步数目标
-    private func completeStepGoal() {
+    // MARK: - 触发亲密度升级
+    private func triggerIntimacyUpgrade() {
+        // 增加步数和亲密度
         demoProfile.stepCount += 20
-        demoState = .intimacyUpgrade
-        
-        // 增加亲密度
         demoProfile.addIntimacy(30) // 升级到3级
         
+        demoState = .intimacyUpgrade
+        shouldPlayEvolutionAnimation = true // 标记需要播放进化动画
         saveDemoData()
-        print("🎬 Demo: 完成步数目标，亲密度升级到\(demoProfile.intimacyGrade)级")
+        print("🎬 Demo: 触发亲密度升级，亲密度升级到\(demoProfile.intimacyGrade)级")
         
         // 发送完成通知
         sendCompletionNotification()
         
-        // 3秒后进入语音交互阶段
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        // 8秒后进入语音交互阶段（给升级动画足够时间：1秒延迟+2秒播放+5秒等待）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
             self.demoState = .voiceInteraction
             self.saveDemoData()
             print("🎬 Demo: 进入语音交互阶段")
         }
+    }
+    
+    // MARK: - 完成步数目标（保留用于兼容性）
+    private func completeStepGoal() {
+        // 这个方法现在被 triggerIntimacyUpgrade 替代
+        triggerIntimacyUpgrade()
     }
     
     // MARK: - 开始录音
@@ -168,54 +188,36 @@ class DemoManager: ObservableObject {
         // 播放模拟回复音频
         playMockResponse()
         
-        // 完成demo
+        // 进入语音完成阶段，而不是直接完成demo
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            self.demoState = .completed
+            self.demoState = .voiceCompleted
             self.saveDemoData()
-            print("🎬 Demo: 完成")
+            print("🎬 Demo: 进入语音完成阶段")
         }
     }
     
     // MARK: - 发送久坐提醒
     private func sendSedentaryReminder() {
-        // 这里应该调用系统通知，但为了demo简化，我们只打印
-        print("🔔 发送久坐提醒通知")
+        print("🔔 发送久坐提醒通知 - 元素: 木")
         
-        // 实际项目中可以调用 SystemNotificationManager
-        let content = UNMutableNotificationContent()
-        content.title = "木木提醒你"
-        content.body = "坐太久啦！起来活动活动吧～"
-        content.categoryIdentifier = "PET_NOTIFICATION"
-        
-        let request = UNNotificationRequest(identifier: "demo_sedentary", content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
-        
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ 发送通知失败: \(error)")
-            } else {
-                print("✅ 久坐提醒通知已发送")
-            }
-        }
+        // 使用现有的通知系统发送久坐建议通知
+        SystemNotificationManager.shared.sendSuggestionNotification(
+            for: "木", // Demo中固定为木属性
+            taskType: .sedentary,
+            delay: 1
+        )
     }
     
     // MARK: - 发送完成通知
     private func sendCompletionNotification() {
-        print("🔔 发送完成通知")
+        print("🔔 发送完成通知 - 元素: 木")
         
-        let content = UNMutableNotificationContent()
-        content.title = "太棒了！"
-        content.body = "你完成了运动目标，木木很开心～亲密度+30！"
-        content.categoryIdentifier = "PET_NOTIFICATION"
-        
-        let request = UNNotificationRequest(identifier: "demo_completion", content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
-        
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ 发送通知失败: \(error)")
-            } else {
-                print("✅ 完成通知已发送")
-            }
-        }
+        // 使用现有的通知系统发送久坐完成通知
+        SystemNotificationManager.shared.sendCompletionNotification(
+            for: "木", // Demo中固定为木属性
+            taskType: .sedentary,
+            delay: 1
+        )
     }
     
     // MARK: - 播放模拟回复
@@ -226,14 +228,16 @@ class DemoManager: ObservableObject {
     }
     
     // MARK: - 保存Demo数据
-    private func saveDemoData() {
+    func saveDemoData() {
         let demoData = DemoData(
             isDemo: isDemo,
             demoState: demoState,
             demoProfile: demoProfile,
             showNotificationBar: showNotificationBar,
             notificationMessage: notificationMessage,
-            stepCountBeforeReminder: stepCountBeforeReminder
+            stepCountBeforeReminder: stepCountBeforeReminder,
+            hasShownWelcome: hasShownWelcome,
+            shouldPlayEvolutionAnimation: shouldPlayEvolutionAnimation
         )
         
         if let data = try? JSONEncoder().encode(demoData) {
@@ -251,8 +255,10 @@ class DemoManager: ObservableObject {
             showNotificationBar = demoData.showNotificationBar
             notificationMessage = demoData.notificationMessage
             stepCountBeforeReminder = demoData.stepCountBeforeReminder
+            hasShownWelcome = demoData.hasShownWelcome
+            shouldPlayEvolutionAnimation = demoData.shouldPlayEvolutionAnimation
             
-            print("🎬 Demo数据已加载: 状态=\(demoState.rawValue)")
+            print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation)")
         }
     }
     
@@ -270,6 +276,8 @@ private struct DemoData: Codable {
     let showNotificationBar: Bool
     let notificationMessage: String
     let stepCountBeforeReminder: Int
+    let hasShownWelcome: Bool
+    let shouldPlayEvolutionAnimation: Bool
 }
 
 // MARK: - Demo工具扩展
@@ -291,6 +299,8 @@ extension DemoManager {
             return "亲密度升级阶段"
         case .voiceInteraction:
             return "语音交互阶段"
+        case .voiceCompleted:
+            return "语音完成阶段"
         case .completed:
             return "Demo完成"
         }
@@ -298,6 +308,6 @@ extension DemoManager {
     
     // 检查是否可以退出demo
     var canExitDemo: Bool {
-        return demoState == .completed || demoState == .voiceInteraction
+        return demoState == .completed || demoState == .voiceInteraction || demoState == .voiceCompleted
     }
 }

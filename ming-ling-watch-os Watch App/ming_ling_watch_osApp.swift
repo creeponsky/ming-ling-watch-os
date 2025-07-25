@@ -42,20 +42,14 @@ struct ming_ling_watch_os_Watch_AppApp: App {
     
     // MARK: - Demo应用流程
     private var demoAppFlow: some View {
-        NavigationView {
-            switch demoManager.demoState {
-            case .birthdaySelection:
+        NavigationStack {
+            if demoManager.demoState == .birthdaySelection {
                 DemoBirthdaySelectionView()
-            case .mainPage, .sedentaryTrigger, .stepDetection, .intimacyUpgrade, .voiceInteraction, .completed:
+            } else {
                 DemoMainPetView()
-            default:
-                // 回退到正常流程
-                MainPetView()
-                    .onAppear {
-                        demoManager.exitDemo()
-                    }
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        .animation(.easeInOut(duration: 0.8), value: demoManager.demoState)
     }
 }
