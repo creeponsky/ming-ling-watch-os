@@ -238,11 +238,41 @@ struct DemoMainPetView: View {
     // MARK: - 健康检测面板
     private var healthDetectionPanel: some View {
         VStack(spacing: 16) {
-            Text("健康检测")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(.green)
+            // 标题和退出按钮
+            HStack {
+                Text("健康检测")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.green)
+                
+                Spacer()
+                
+                // 退出Demo按钮
+                Button(action: {
+                    demoManager.exitDemo()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
+                        Text("退出Demo")
+                            .font(.caption2)
+                    }
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.red.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
             
+            // 开始久坐检测按钮
             Button(action: {
                 demoManager.triggerSedentaryDetection()
                 withAnimation(.spring()) {
@@ -276,6 +306,18 @@ struct DemoMainPetView: View {
             }
             .buttonStyle(PlainButtonStyle())
             .disabled(demoManager.demoState != .mainPage)
+            
+            // Demo状态信息
+            VStack(spacing: 4) {
+                Text("当前Demo阶段")
+                    .font(.caption2)
+                    .foregroundColor(.green.opacity(0.7))
+                
+                Text(demoManager.stateDescription)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.green)
+            }
         }
         .padding()
         .background(

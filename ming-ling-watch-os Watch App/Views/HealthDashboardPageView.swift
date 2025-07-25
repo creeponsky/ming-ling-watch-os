@@ -92,7 +92,7 @@ struct HealthDashboardPageView: View {
     // MARK: - 健康卡片区域
     private var healthCardsSection: some View {
         VStack(spacing: 16) {
-            Text("今日健康监测")
+            Text("今日健康监测11")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -285,7 +285,7 @@ struct HealthDashboardPageView: View {
                             
                             Text(demoManager.isDemo ? "重新开始Demo流程" : "体验完整功能演示")
                                 .font(.caption)
-                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                                .foregroundColor(demoManager.isDemo ? PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7) : .white.opacity(0.9))
                         }
                         
                         Spacer()
