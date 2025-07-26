@@ -10,8 +10,7 @@ struct DemoMainPetView: View {
     @StateObject private var speechAPIService = SpeechAPIService.shared
     @StateObject private var audioPlayerManager = AudioPlayerManager.shared
     
-    @State private var showUpgradeAnimation = false
-    @State private var isPlayingUpgradeGIF = false
+
     @State private var showInteractionAnimation = false
     @State private var showHealthDetection = false
     @State private var showVoiceCompleted = false
@@ -40,9 +39,19 @@ struct DemoMainPetView: View {
                             .transition(.opacity)
                             .animation(.easeInOut(duration: 0.8), value: shouldShowMainContent)
                             .gesture(
-                                // 使用DragGesture来更精确地控制手势
+                                // 使用DragGesture来更精确地控制手势，但排除右上角区域
                                 DragGesture(minimumDistance: 0)
-                                    .onChanged { _ in
+                                    .onChanged { value in
+                                        // 检查点击位置是否在右上角退出按钮区域（约60x60的区域）
+                                        let location = value.startLocation
+                                        let screenWidth = WKInterfaceDevice.current().screenBounds.width
+                                        let isInExitButtonArea = location.x > screenWidth - 60 && location.y < 60
+                                        
+                                        // 如果在退出按钮区域，不处理宠物手势
+                                        if isInExitButtonArea {
+                                            return
+                                        }
+                                        
                                         // 按下时的处理
                                         if demoManager.demoState == .voiceInteraction && demoManager.demoProfile.intimacyGrade >= 3 {
                                             if recordingState == .idle && !isLongPressing {
@@ -59,7 +68,18 @@ struct DemoMainPetView: View {
                                             }
                                         }
                                     }
-                                    .onEnded { _ in
+                                    .onEnded { value in
+                                        // 检查点击位置是否在右上角退出按钮区域
+                                        let location = value.startLocation
+                                        let screenWidth = WKInterfaceDevice.current().screenBounds.width
+                                        let isInExitButtonArea = location.x > screenWidth - 60 && location.y < 60
+                                        
+                                        // 如果在退出按钮区域，不处理宠物手势
+                                        if isInExitButtonArea {
+                                            isLongPressing = false
+                                            return
+                                        }
+                                        
                                         // 松开时的处理
                                         if demoManager.demoState == .voiceInteraction && demoManager.demoProfile.intimacyGrade >= 3 {
                                             if recordingState == .recording {
@@ -101,12 +121,13 @@ struct DemoMainPetView: View {
                                 Spacer()
                                 
                                 Button(action: {
+                                    print("🚪 点击退出Demo按钮")
                                     demoManager.exitDemo()
                                 }) {
                                     Image(systemName: "xmark")
-                                        .font(.caption)
+                                        .font(.title2) // 放大字体
                                         .foregroundColor(.white)
-                                        .frame(width: 20, height: 20)
+                                        .frame(width: 40, height: 40) // 放大点击区域（2倍）
                                         .background(
                                             Circle()
                                                 .fill(Color.black.opacity(0.3))
@@ -115,11 +136,14 @@ struct DemoMainPetView: View {
                                 .buttonStyle(PlainButtonStyle())
                                 .padding(.top, 8)
                                 .padding(.trailing, 8)
+                                .allowsHitTesting(true) // 确保按钮可以接收点击
+                                .scaleEffect(1.0) // 保持正常大小
                             }
                             Spacer()
                         }
-                        .zIndex(500) // 确保在其他内容之上，但在录音指示器和欢迎对话框之下
-                        .opacity(0.6) // 半透明效果
+                        .zIndex(1001) // 提高 zIndex，确保在所有内容之上（包括欢迎对话框）
+                        .opacity(0.1) // 降低透明度到 10%
+                        .allowsHitTesting(true) // 确保整个区域可以接收点击
                     }
 
                     // 健康检测页面预览（左滑时显示）
@@ -147,19 +171,39 @@ struct DemoMainPetView: View {
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in
+                        // 检查起始位置是否在右上角退出按钮区域
+                        let location = value.startLocation
+                        let screenWidth = WKInterfaceDevice.current().screenBounds.width
+                        let isInExitButtonArea = location.x > screenWidth - 60 && location.y < 60
+                        
+                        // 如果在退出按钮区域，不处理左滑手势
+                        if isInExitButtonArea {
+                            return
+                        }
+                        
                         // 只处理左滑手势，且亲密度小于3级，且在允许的状态下，且欢迎对话框未激活
                         if value.translation.width < 0 && demoManager.demoProfile.intimacyGrade < 3 &&
                            (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction) && !isWelcomeActive {
                             isSwipeActive = true
                             swipeOffset = value.translation.width
-                            print("🔄 左滑手势: translation.width = \(value.translation.width)")
+                            // print("🔄 左滑手势: translation.width = \(value.translation.width)")
                         }
                     }
                     .onEnded { value in
-                        print("🔄 手势结束: translation.width = \(value.translation.width), 当前状态 = \(demoManager.demoState.rawValue)")
+                        // 检查起始位置是否在右上角退出按钮区域
+                        let location = value.startLocation
+                        let screenWidth = WKInterfaceDevice.current().screenBounds.width
+                        let isInExitButtonArea = location.x > screenWidth - 60 && location.y < 60
+                        
+                        // 如果在退出按钮区域，不处理左滑手势
+                        if isInExitButtonArea {
+                            return
+                        }
+                        
+                        // print("🔄 手势结束: translation.width = \(value.translation.width), 当前状态 = \(demoManager.demoState.rawValue)")
 
                         if value.translation.width < -80 {
-                            print("✅ 手势距离满足条件")
+                            // print("✅ 手势距离满足条件")
 
                             // 如果在欢迎状态，先关闭欢迎对话框
                             if isWelcomeActive && demoManager.demoState == .mainPage {
@@ -186,7 +230,7 @@ struct DemoMainPetView: View {
                                 }
                             }
                         } else {
-                            print("❌ 手势距离不满足条件，需要 < -80，实际: \(value.translation.width)")
+                            // print("❌ 手势距离不满足条件，需要 < -80，实际: \(value.translation.width)")
                             // 重置滑动状态
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 swipeOffset = 0
@@ -197,6 +241,9 @@ struct DemoMainPetView: View {
             )
                     .onAppear {
             setupDemoState()
+            // 重新计算倒计时，确保后台状态恢复正常
+            demoManager.recalculateCountdown()
+            
             // 初始化欢迎对话框状态 - 如果是主页面状态，等待DemoManager控制欢迎对话框显示
             if demoManager.demoState == .mainPage {
                 // 主内容区域默认不显示，等待欢迎对话框关闭后再显示
@@ -320,9 +367,6 @@ struct DemoMainPetView: View {
                     evolutionPhase: $evolutionPhase,
                     showEvolutionAnimation: $showEvolutionAnimation
                 )
-            } else if showUpgradeAnimation && isPlayingUpgradeGIF {
-                // 升级动画
-                upgradeAnimationView
             } else {
                 // 正常宠物显示
                 PetDisplayView(showInteractionAnimation: $showInteractionAnimation)
@@ -334,20 +378,7 @@ struct DemoMainPetView: View {
 
 
 
-    // MARK: - 升级动画视图
-    private var upgradeAnimationView: some View {
-        VStack {
-            GIFAnimationView(gifName: "GIFs/mumu/grow/2-3", isPlaying: isPlayingUpgradeGIF)
-                .frame(width: 150, height: 150)
 
-            Text("🎉 亲密度升级！")
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(.yellow)
-                .scaleEffect(showUpgradeAnimation ? 1.2 : 1.0)
-                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: showUpgradeAnimation)
-        }
-    }
 
 
 
@@ -414,14 +445,19 @@ struct DemoMainPetView: View {
     // MARK: - 处理状态变化
     private func handleStateChange(_ newState: DemoState) {
         switch newState {
-        case .intimacyUpgrade:
-            startUpgradeAnimation()
         case .voiceInteraction:
             // 隐藏通知栏，确保主内容显示
             withAnimation {
                 demoManager.showNotificationBar = false
                 isWelcomeActive = false
                 shouldShowMainContent = true
+            }
+            
+            // 如果标记需要播放进化动画，启动动画
+            if demoManager.shouldPlayEvolutionAnimation {
+                startEvolutionAnimation()
+                demoManager.shouldPlayEvolutionAnimation = false
+                demoManager.saveDemoData()
             }
         case .mainPage:
             // 如果回到主页面，检查是否需要显示欢迎对话框
@@ -502,31 +538,7 @@ struct DemoMainPetView: View {
         }
     }
 
-    // MARK: - 显示升级动画
-    private func startUpgradeAnimation() {
-        showUpgradeAnimation = true
-        isPlayingUpgradeGIF = false // 初始不播放
 
-        // 1秒后开始播放GIF
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            isPlayingUpgradeGIF = true
-            print("🎬 开始播放升级GIF动画")
-
-            // 假设GIF播放时间为2秒，然后暂停
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                isPlayingUpgradeGIF = false
-                print("🎬 升级GIF动画播放完成，暂停")
-
-                // 再等待5秒后隐藏整个升级动画
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    withAnimation {
-                        showUpgradeAnimation = false
-                    }
-                    print("🎬 升级动画结束，进入语音交互阶段")
-                }
-            }
-        }
-    }
 
 
 

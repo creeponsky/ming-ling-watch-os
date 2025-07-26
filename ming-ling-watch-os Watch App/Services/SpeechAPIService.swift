@@ -26,7 +26,7 @@ class SpeechAPIService: ObservableObject {
         request.addValue("Bearer sk-7qaHhZxF52d2va8ckALDvsXEtdjzpF0IL1Qy4B7KeLlvXFAx", forHTTPHeaderField: "Authorization")
 
         let requestBody: [String: Any] = [
-            "model": "speech-02-hd",
+            "model": "speech-02-turbo",
             "input": text,
             "voice": "ttv-voice-2025072518250625-MpUt9UZ9"
         ]

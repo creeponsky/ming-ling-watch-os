@@ -150,7 +150,12 @@ struct DemoHealthDetectionView: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(demoManager.demoState != .mainPage && demoManager.demoState != .voiceInteraction || demoManager.demoState == .sedentaryTrigger)
+        .disabled(
+            demoManager.demoProfile.hasCompletedDemo || 
+            demoManager.demoProfile.stepGoalCompleted ||
+            (demoManager.demoState != .mainPage && demoManager.demoState != .voiceInteraction) ||
+            demoManager.demoState == .sedentaryTrigger
+        )
     }
     
     // MARK: - 步数记录显示
@@ -163,7 +168,7 @@ struct DemoHealthDetectionView: View {
                     .frame(width: 120, height: 120)
                 
                 Circle()
-                    .trim(from: 0, to: min(1.0, Double(demoManager.demoProfile.stepCount) / 20.0))
+                    .trim(from: 0, to: min(1.0, Double(demoManager.demoProfile.stepCount) / 10.0))
                     .stroke(PetUtils.getElementDialogColor(for: "木"), style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .frame(width: 120, height: 120)
                     .rotationEffect(.degrees(-90))
@@ -181,11 +186,11 @@ struct DemoHealthDetectionView: View {
                 }
             }
             
-            Text("目标: 20步")
+            Text("目标: 10步")
                 .font(.caption)
                 .foregroundColor(PetUtils.getElementTextColor(for: "木").opacity(0.7))
             
-            if demoManager.demoProfile.stepCount >= 20 {
+            if demoManager.demoProfile.stepCount >= 10 {
                 Text("🎉 目标完成！")
                     .font(.headline)
                     .fontWeight(.bold)
@@ -252,27 +257,87 @@ struct DemoHealthDetectionView: View {
     
     // MARK: - 设置视图
     private func setupView() {
+        print("🎬 DemoHealthDetectionView 设置视图 - 当前状态: \(demoManager.demoState.rawValue)")
+        
         // 重新计算倒计时，确保准确性
         demoManager.recalculateCountdown()
         
-        // 如果已经在步数检测阶段，显示步数记录
-        if demoManager.demoState == .stepDetection {
+        // 检查当前状态并设置正确的显示
+        switch demoManager.demoState {
+        case .stepDetection:
+            // 如果在步数检测阶段，显示步数记录
             showStepCount = true
+            print("🎬 当前在步数检测阶段，显示步数记录")
+        case .sedentaryTrigger:
+            // 如果在久坐触发阶段，显示久坐检测界面
+            showStepCount = false
+            print("🎬 当前在久坐触发阶段，显示久坐检测界面")
+        case .mainPage, .voiceInteraction:
+            // 如果在主页面或语音交互阶段，检查是否已完成步数目标
+            if demoManager.demoProfile.stepGoalCompleted {
+                showStepCount = true
+                print("🎬 步数目标已完成，显示步数记录")
+            } else {
+                showStepCount = false
+                print("🎬 在主页面状态，显示久坐检测界面")
+            }
+        default:
+            showStepCount = false
+            print("🎬 其他状态，显示久坐检测界面")
         }
     }
     
     // MARK: - 监听Demo状态变化
     private func onDemoStateChanged() {
-        if demoManager.demoState == .stepDetection && !showStepCount {
-            withAnimation {
-                showStepCount = true
+        print("🎬 DemoHealthDetectionView 状态变化: \(demoManager.demoState.rawValue)")
+        
+        switch demoManager.demoState {
+        case .stepDetection:
+            // 进入步数检测阶段，显示步数记录
+            if !showStepCount {
+                withAnimation {
+                    showStepCount = true
+                }
+                print("🎬 切换到步数记录显示")
             }
+        case .sedentaryTrigger:
+            // 进入久坐触发阶段，显示久坐检测界面
+            if showStepCount {
+                withAnimation {
+                    showStepCount = false
+                }
+                print("🎬 切换到久坐检测显示")
+            }
+        case .mainPage, .voiceInteraction:
+            // 如果已完成步数目标，继续显示步数记录；否则显示久坐检测
+            let shouldShowSteps = demoManager.demoProfile.stepGoalCompleted
+            if showStepCount != shouldShowSteps {
+                withAnimation {
+                    showStepCount = shouldShowSteps
+                }
+                print("🎬 根据完成状态切换显示: \(shouldShowSteps ? "步数记录" : "久坐检测")")
+            }
+
+        default:
+            break
         }
     }
     
     // MARK: - 开始久坐检测
     private func startSedentaryDetection() {
         print("🔘 开始久坐检测流程")
+        
+        // 检查是否已经完成过Demo
+        guard !demoManager.demoProfile.hasCompletedDemo && !demoManager.demoProfile.stepGoalCompleted else {
+            print("⚠️ Demo已完成或步数目标已达成，不能重新开始检测")
+            return
+        }
+        
+        // 检查当前状态是否允许开始检测
+        guard demoManager.demoState == .mainPage || demoManager.demoState == .voiceInteraction else {
+            print("⚠️ 当前状态(\(demoManager.demoState.rawValue))不允许开始久坐检测")
+            return
+        }
         
         // 立即触发DemoManager的久坐检测
         demoManager.triggerSedentaryDetection()

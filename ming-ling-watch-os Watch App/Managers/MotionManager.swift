@@ -69,14 +69,23 @@ class MotionManager: NSObject, ObservableObject {
         stepCountingCallback = callback
         
         guard CMPedometer.isStepCountingAvailable() else {
-            print("步数监测不可用")
+            print("❌ [MotionManager] 步数监测不可用")
             return
         }
         
         let startDate = Calendar.current.startOfDay(for: Date())
+        print("📱 [MotionManager] 开始步数监测，起始时间: \(startDate)")
         
         pedometer.startUpdates(from: startDate) { [weak self] data, error in
-            guard let data = data else { return }
+            if let error = error {
+                print("❌ [MotionManager] 步数监测错误: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let data = data else {
+                print("⚠️ [MotionManager] 步数数据为空")
+                return
+            }
             
             DispatchQueue.main.async {
                 let steps = data.numberOfSteps.intValue
@@ -87,6 +96,8 @@ class MotionManager: NSObject, ObservableObject {
                 self?.pedometerCadence = data.currentCadence?.doubleValue ?? 0
                 self?.pedometerAverageActivePace = data.averageActivePace?.doubleValue ?? 0
                 
+                print("📱 [MotionManager] 步数更新: \(steps), 距离: \(data.distance?.doubleValue ?? 0)m")
+                
                 // 调用回调函数
                 self?.stepCountingCallback?(steps)
             }
@@ -94,6 +105,7 @@ class MotionManager: NSObject, ObservableObject {
     }
     
     func stopStepCounting() {
+        print("📱 [MotionManager] 停止步数监测")
         pedometer.stopUpdates()
         stepCountingCallback = nil
     }

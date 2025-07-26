@@ -9,7 +9,6 @@ enum DemoState: String, CaseIterable, Codable {
     case mainPage = "main_page"                   // 主页面阶段  
     case sedentaryTrigger = "sedentary_trigger"   // 久坐触发阶段
     case stepDetection = "step_detection"         // 步数检测阶段
-    case intimacyUpgrade = "intimacy_upgrade"     // 亲密度升级阶段
     case voiceInteraction = "voice_interaction"   // 语音交互阶段
     case completed = "completed"                  // demo完成
 }
@@ -23,6 +22,8 @@ struct DemoUserProfile: Codable {
     var lastHealthCheck: Date = Date()
     var stepCount: Int = 0
     var isWoodElement: Bool = true // demo中固定为木属性
+    var hasCompletedDemo: Bool = false // 新增：是否已完成Demo
+    var stepGoalCompleted: Bool = false // 新增：步数目标是否已完成
     
     var intimacyGrade: Int {
         if intimacyLevel >= 80 {
@@ -36,6 +37,15 @@ struct DemoUserProfile: Codable {
     
     mutating func addIntimacy(_ points: Int) {
         intimacyLevel = min(100, intimacyLevel + points)
+    }
+    
+    mutating func completeStepGoal() {
+        stepGoalCompleted = true
+    }
+    
+    mutating func completeDemo() {
+        hasCompletedDemo = true
+        stepGoalCompleted = true
     }
 }
 
@@ -86,6 +96,8 @@ class DemoManager: ObservableObject {
     
     // MARK: - 退出Demo
     func exitDemo() {
+        print("🎬 Demo: 开始退出Demo流程")
+        
         isDemo = false
         demoState = .inactive
         demoProfile = DemoUserProfile()
@@ -94,17 +106,26 @@ class DemoManager: ObservableObject {
         hasShownWelcome = false
         shouldPlayEvolutionAnimation = false
         countdownSeconds = 180
+        sedentaryCountdown = 10
         isStepMonitoringActive = false
-        // sedentaryCountdown 现在由新的倒计时逻辑管理
+        
+        // 重置步数相关状态
+        initialStepCount = 0
+        stepCheckCount = 0
         
         // 重置倒计时结束时间
         countdownEndTime = nil
         sedentaryEndTime = nil
         
-        // 停止所有计时器
+        // 停止所有计时器和监测
         stopStepMonitoring()
+        
+        // 确保恢复其他健康监测服务
+        HealthMonitoringService.shared.startMonitoring()
+        
         clearDemoData()
-        print("🎬 Demo结束")
+        
+        print("🎬 Demo结束，所有状态已重置")
     }
     
     // MARK: - 重置Demo
@@ -177,30 +198,41 @@ class DemoManager: ObservableObject {
         }
     }
     
-    // MARK: - 触发亲密度升级
-    private func triggerIntimacyUpgrade() {
+    // MARK: - 完成步数目标
+    private func completeStepGoal() {
+        // 检查是否已经完成过Demo
+        guard !demoProfile.hasCompletedDemo else {
+            print("⚠️ Demo已完成，跳过步数完成处理")
+            return
+        }
+        
         // 增加步数和亲密度
         demoProfile.addIntimacy(30) // 升级到3级
+        demoProfile.completeDemo() // 标记Demo完成
         
-        demoState = .intimacyUpgrade
+        // 直接进入语音交互阶段，标记需要播放进化动画
+        demoState = .voiceInteraction
         shouldPlayEvolutionAnimation = true // 标记需要播放进化动画
         saveDemoData()
-        print("🎬 Demo: 触发亲密度升级，亲密度升级到\(demoProfile.intimacyGrade)级")
+        print("🎬 Demo: 步数目标完成，直接进入语音交互阶段，准备播放进化动画")
         
         // 发送完成通知
         sendCompletionNotification()
-        
-        // 8秒后进入语音交互阶段（给升级动画足够时间：1秒延迟+2秒播放+5秒等待）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
-            self.demoState = .voiceInteraction
-            self.saveDemoData()
-            print("🎬 Demo: 进入语音交互阶段")
-        }
     }
     
     // MARK: - 开始真实步数监测
     private func startRealStepMonitoring() {
         print("🎬 Demo: 开始真实步数监测")
+        
+        // 检查是否已经完成过Demo
+        guard !demoProfile.hasCompletedDemo && !demoProfile.stepGoalCompleted else {
+            print("⚠️ Demo已完成或步数目标已达成，跳过步数监测")
+            return
+        }
+        
+        // 停止其他健康监测服务，避免回调冲突
+        print("🔧 [Demo] 暂停其他健康监测服务，避免步数监测冲突")
+        HealthMonitoringService.shared.stopMonitoring()
         
         // 重置步数为0，因为我们只关心增量
         demoProfile.stepCount = 0
@@ -210,116 +242,135 @@ class DemoManager: ObservableObject {
         let startTime = Date()
         print("🎬 Demo: 开始监测时间: \(startTime)")
         
-        // 先启动步数监测，让MotionManager开始工作
-        motionManager.startStepCounting { [weak self] currentTotalSteps in
-            self?.handleStepCountUpdate(currentTotalSteps)
-        }
-        
-        // 延迟2秒后获取初始步数，确保MotionManager已经开始工作
+        // 延迟2秒后先获取MotionManager的当前步数作为基准
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            let now = Date()
-            print("🎬 Demo: 获取初始步数时间: \(now)")
+            guard let self = self else { return }
             
-            // 获取当前时刻的步数作为初始值
-            self?.healthKitManager.getSteps(from: Calendar.current.startOfDay(for: Date()), to: now) { totalSteps in
-                DispatchQueue.main.async {
-                    // 设置一个标记，表示倒计时即将开始，但还在准备阶段
-                    self?.initialStepCount = totalSteps
-                    self?.demoProfile.stepCount = 0
-                    print("🎬 Demo: 设置初始步数: \(totalSteps) (准备阶段)")
-                    
-                    // 启动180秒倒计时
-                    self?.startCountdownTimer()
-                    
-                    // 10秒后（准备时间结束）重新获取初始步数，开始正式计算
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
-                        self?.healthKitManager.getSteps(from: Calendar.current.startOfDay(for: Date()), to: Date()) { newTotalSteps in
-                            DispatchQueue.main.async {
-                                self?.initialStepCount = newTotalSteps
-                                self?.demoProfile.stepCount = 0
-                                print("🎬 Demo: 准备时间结束，重新设置初始步数: \(newTotalSteps)，开始正式计算")
-                                self?.objectWillChange.send()
-                            }
-                        }
-                    }
-                    
-                    // 确保UI更新
-                    self?.objectWillChange.send()
-                }
+            // 再次检查Demo状态，确保没有被中断或重置
+            guard self.isStepMonitoringActive && self.demoState == .stepDetection else {
+                print("⚠️ Demo状态已改变，停止步数监测初始化")
+                return
             }
+            
+            // 先从MotionManager获取当前步数作为基准
+            let motionManagerSteps = self.motionManager.pedometerSteps
+            print("📱 [MotionManager] 当前步数: \(motionManagerSteps)")
+            
+            // 设置初始步数（使用MotionManager的数据作为基准）
+            self.initialStepCount = motionManagerSteps
+            self.demoProfile.stepCount = 0
+            print("🎬 Demo: 设置初始步数: \(motionManagerSteps) (使用MotionManager数据)")
+            
+            // 启动MotionManager步数监测
+            self.motionManager.startStepCounting { [weak self] currentTotalSteps in
+                print("📱 [Demo-MotionManager回调] 步数更新: \(currentTotalSteps)")
+                self?.handleStepCountUpdate(currentTotalSteps)
+            }
+            
+            // 启动180秒倒计时
+            self.startCountdownTimer()
+            
+            // 确保UI更新
+            self.objectWillChange.send()
         }
     }
     
     // MARK: - 处理步数更新
     private func handleStepCountUpdate(_ currentTotalSteps: Int) {
-        guard isStepMonitoringActive else { return }
-        
-        stepCheckCount += 1
-        
-        // 如果初始步数还没有设置，先设置初始步数
-        if initialStepCount == 0 {
-            initialStepCount = currentTotalSteps
-            demoProfile.stepCount = 0
-            print("🎬 Demo: 首次设置初始步数: \(initialStepCount)")
-            return
-        }
-        
-        // 计算从开始监测后的步数增量
-        let stepIncrease = currentTotalSteps - initialStepCount
-        
-        print("🎬 Demo: 步数处理 - 当前总步数: \(currentTotalSteps), 初始步数: \(initialStepCount), 计算增量: \(stepIncrease), 检查次数: \(stepCheckCount)")
-        
-        // 处理负数增量的情况（初始步数可能不准确）
-        if stepIncrease < 0 {
-            print("🎬 Demo: 检测到负数增量: \(stepIncrease)，重新校准初始步数")
-            
-            // 如果这是前几次检查，重新设置初始步数
-            if stepCheckCount <= 5 {
-                initialStepCount = currentTotalSteps
-                demoProfile.stepCount = 0
-                print("🎬 Demo: 重新校准初始步数: \(initialStepCount)，从0开始计算")
-                return
-            } else {
-                // 如果已经检查多次还是负数，可能是数据异常，忽略此次更新
-                print("🎬 Demo: 多次检查均为负数，忽略此次更新")
+        // 确保在主线程执行
+        DispatchQueue.main.async {
+            // 检查是否还在步数监测状态
+            guard self.isStepMonitoringActive && self.demoState == .stepDetection else {
+                print("⚠️ [步数处理] 步数监测已停止或状态已改变，忽略更新")
                 return
             }
-        }
-        
-        // 第一次检查时，如果增量过大（超过30步），重新设置初始步数
-        if stepCheckCount == 1 && stepIncrease > 30 {
-            print("🎬 Demo: 第一次检查增量过大(\(stepIncrease))，重新设置初始步数为当前步数")
-            initialStepCount = currentTotalSteps
-            demoProfile.stepCount = 0
-            print("🎬 Demo: 重新设置初始步数: \(initialStepCount)，从0开始计算")
-            return
-        }
-        
-        // 如果增量异常过大（超过200步），可能是数据异常，忽略
-        if stepIncrease > 200 {
-            print("🎬 Demo: 步数增量异常过大: \(stepIncrease)，忽略此次更新")
-            return
-        }
-        
-        // 更新步数增量
-        let newStepCount = stepIncrease
-        if newStepCount != demoProfile.stepCount {
-            demoProfile.stepCount = newStepCount
-            print("🎬 Demo: 步数更新成功 - 新增量: \(newStepCount)")
             
-            // 确保UI在主线程更新
-            DispatchQueue.main.async {
+            // 检查是否已经完成目标
+            guard !self.demoProfile.stepGoalCompleted && !self.demoProfile.hasCompletedDemo else {
+                print("⚠️ [步数处理] 步数目标已完成，停止处理更新")
+                self.stopStepMonitoring()
+                return
+            }
+            
+            self.stepCheckCount += 1
+            
+            // 获取当前MotionManager的原始数据用于对比
+            let motionManagerRaw = self.motionManager.pedometerSteps
+            
+            print("📊 [数据源对比] MotionManager原始: \(motionManagerRaw), 回调传入: \(currentTotalSteps)")
+            
+            // 如果初始步数还没有设置，先设置初始步数
+            if self.initialStepCount == 0 {
+                self.initialStepCount = currentTotalSteps
+                self.demoProfile.stepCount = 0
+                print("🎬 [步数处理] 首次设置初始步数: \(self.initialStepCount)")
                 self.objectWillChange.send()
+                return
             }
-        } else {
-            print("🎬 Demo: 步数无变化，跳过更新")
-        }
-        
-        // 检查是否达到目标（20步）
-        if newStepCount >= 20 {
-            print("🎬 Demo: 达到步数目标！")
-            stopStepMonitoring()
-            triggerIntimacyUpgrade()
+            
+            // 计算从开始监测后的步数增量
+            let stepIncrease = currentTotalSteps - self.initialStepCount
+            
+            print("🎬 [步数处理] 当前总步数: \(currentTotalSteps), 初始步数: \(self.initialStepCount), 计算增量: \(stepIncrease), 检查次数: \(self.stepCheckCount)")
+            
+            // 处理负数增量的情况
+            if stepIncrease < 0 {
+                print("⚠️ [步数处理] 检测到负数增量: \(stepIncrease)")
+                print("📊 [数据源分析] 可能原因：数据源不一致或步数计算器重置")
+                
+                // 如果这是前几次检查，重新设置初始步数
+                if self.stepCheckCount <= 5 {
+                    self.initialStepCount = currentTotalSteps
+                    self.demoProfile.stepCount = 0
+                    print("🔧 [步数处理] 重新校准初始步数: \(self.initialStepCount)，从0开始计算")
+                    self.objectWillChange.send()
+                    return
+                } else {
+                    // 如果已经检查多次还是负数，可能是数据异常，忽略此次更新
+                    print("❌ [步数处理] 多次检查均为负数，忽略此次更新")
+                    return
+                }
+            }
+            
+            // 第一次检查时，如果增量过大（超过30步），重新设置初始步数
+            if self.stepCheckCount == 1 && stepIncrease > 30 {
+                print("⚠️ [步数处理] 第一次检查增量过大(\(stepIncrease))，重新设置初始步数为当前步数")
+                self.initialStepCount = currentTotalSteps
+                self.demoProfile.stepCount = 0
+                print("🔧 [步数处理] 重新设置初始步数: \(self.initialStepCount)，从0开始计算")
+                self.objectWillChange.send()
+                return
+            }
+            
+            // 如果增量异常过大（超过200步），可能是数据异常，忽略
+            if stepIncrease > 200 {
+                print("❌ [步数处理] 步数增量异常过大: \(stepIncrease)，忽略此次更新")
+                return
+            }
+            
+            // 更新步数增量
+            let newStepCount = stepIncrease
+            if newStepCount != self.demoProfile.stepCount {
+                self.demoProfile.stepCount = newStepCount
+                print("✅ [步数处理] 步数更新成功 - 新增量: \(newStepCount)")
+                
+                // 保存状态
+                self.saveDemoData()
+                
+                // 触发UI更新
+                self.objectWillChange.send()
+            } else {
+                print("📍 [步数处理] 步数无变化，跳过更新")
+            }
+            
+            // 检查是否达到目标（10步）
+            if newStepCount >= 10 && !self.demoProfile.stepGoalCompleted {
+                print("🎉 [步数处理] 达到步数目标！")
+                self.demoProfile.completeStepGoal()
+                self.saveDemoData()
+                self.stopStepMonitoring()
+                self.completeStepGoal()
+            }
         }
     }
     
@@ -399,15 +450,23 @@ class DemoManager: ObservableObject {
         countdownEndTime = nil
         sedentaryEndTime = nil
         
+        // 恢复其他健康监测服务
+        print("🔧 [Demo] 恢复其他健康监测服务")
+        HealthMonitoringService.shared.startMonitoring()
+        
         print("🎬 Demo: 步数监测已停止")
     }
     
     // MARK: - 重新计算倒计时（页面重新出现时调用）
     func recalculateCountdown() {
+        print("🎬 Demo: 开始重新计算倒计时 - 当前状态: \(demoState.rawValue)")
+        
         // 重新计算久坐检测倒计时
         if let sedentaryEndTime = sedentaryEndTime, demoState == .sedentaryTrigger {
             let remainingTime = sedentaryEndTime.timeIntervalSinceNow
             sedentaryCountdown = max(0, Int(remainingTime))
+            
+            print("🎬 Demo: 久坐检测剩余时间: \(remainingTime)s")
             
             // 如果时间到了，立即进入步数检测
             if remainingTime <= 0 {
@@ -424,19 +483,38 @@ class DemoManager: ObservableObject {
             let remainingTime = countdownEndTime.timeIntervalSinceNow
             countdownSeconds = max(0, Int(remainingTime))
             
-            // 如果时间到了，停止监测
+            print("🎬 Demo: 步数检测剩余时间: \(remainingTime)s")
+            
+            // 如果时间到了，但没有完成目标，返回主页面
             if remainingTime <= 0 {
-                print("🎬 Demo: 步数检测时间到，停止监测")
-                stopStepMonitoring()
-                demoState = .mainPage
-                saveDemoData()
+                if !demoProfile.stepGoalCompleted {
+                    print("🎬 Demo: 步数检测时间到，未完成目标，返回主页面")
+                    stopStepMonitoring()
+                    demoState = .mainPage
+                    saveDemoData()
+                } else {
+                    print("🎬 Demo: 步数检测时间到，但目标已完成")
+                }
             } else {
-                // 重新启动Timer
+                // 重新启动Timer和步数监测
                 startCountdownTimer()
+                
+                // 如果步数监测未激活，重新启动
+                if !isStepMonitoringActive {
+                    isStepMonitoringActive = true
+                    startRealStepMonitoring()
+                }
             }
         }
         
-        print("🎬 Demo: 倒计时重新计算完成 - 久坐: \(sedentaryCountdown)s, 步数: \(countdownSeconds)s")
+        // 如果从其他状态恢复到步数检测状态，需要确保监测正常运行
+        if demoState == .stepDetection && !isStepMonitoringActive && !demoProfile.stepGoalCompleted {
+            print("🎬 Demo: 检测到步数检测状态但监测未激活，重新启动监测")
+            isStepMonitoringActive = true
+            startRealStepMonitoring()
+        }
+        
+        print("🎬 Demo: 倒计时重新计算完成 - 久坐: \(sedentaryCountdown)s, 步数: \(countdownSeconds)s, 监测状态: \(isStepMonitoringActive)")
     }
     
     // MARK: - 完成步数目标（保留用于兼容性）
@@ -518,7 +596,9 @@ class DemoManager: ObservableObject {
             isStepMonitoringActive: isStepMonitoringActive,
             sedentaryCountdown: sedentaryCountdown,
             countdownEndTime: countdownEndTime,
-            sedentaryEndTime: sedentaryEndTime
+            sedentaryEndTime: sedentaryEndTime,
+            initialStepCount: initialStepCount,
+            stepCheckCount: stepCheckCount
         )
         
         if let data = try? JSONEncoder().encode(demoData) {
@@ -543,14 +623,36 @@ class DemoManager: ObservableObject {
             sedentaryCountdown = demoData.sedentaryCountdown
             countdownEndTime = demoData.countdownEndTime
             sedentaryEndTime = demoData.sedentaryEndTime
+            initialStepCount = demoData.initialStepCount
+            stepCheckCount = demoData.stepCheckCount
             
-            print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation), countdownSeconds=\(countdownSeconds), isStepMonitoringActive=\(isStepMonitoringActive), sedentaryCountdown=\(sedentaryCountdown)")
+            print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation), countdownSeconds=\(countdownSeconds), isStepMonitoringActive=\(isStepMonitoringActive), sedentaryCountdown=\(sedentaryCountdown), stepGoalCompleted=\(demoProfile.stepGoalCompleted), hasCompletedDemo=\(demoProfile.hasCompletedDemo)")
         }
     }
     
     // MARK: - 清除Demo数据
     private func clearDemoData() {
         userDefaults.removeObject(forKey: demoKey)
+    }
+    
+    // MARK: - 应用恢复时的状态检查
+    func handleAppResume() {
+        print("🎬 Demo: 应用从后台恢复，检查状态")
+        
+        // 重新计算倒计时
+        recalculateCountdown()
+        
+        // 如果在步数检测阶段但监测未激活，重新启动
+        if demoState == .stepDetection && !isStepMonitoringActive && !demoProfile.stepGoalCompleted {
+            print("🎬 Demo: 检测到步数检测状态但监测未激活，重新启动监测")
+            isStepMonitoringActive = true
+            startRealStepMonitoring()
+        }
+        
+        // 确保UI更新
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
     }
 }
 
@@ -569,6 +671,8 @@ private struct DemoData: Codable {
     let sedentaryCountdown: Int
     let countdownEndTime: Date?
     let sedentaryEndTime: Date?
+    let initialStepCount: Int
+    let stepCheckCount: Int
 }
 
 // MARK: - Demo工具扩展
@@ -586,8 +690,6 @@ extension DemoManager {
             return "久坐触发阶段"
         case .stepDetection:
             return "步数检测阶段"
-        case .intimacyUpgrade:
-            return "亲密度升级阶段"
         case .voiceInteraction:
             return "语音交互阶段"
         case .completed:
