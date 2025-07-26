@@ -4,7 +4,7 @@ class TranscriptionAPIService: ObservableObject {
     static let shared = TranscriptionAPIService()
 
     private let apiKey = "sk-7qaHhZxF52d2va8ckALDvsXEtdjzpF0IL1Qy4B7KeLlvXFAx"
-    private let transcriptionURL = URL(string: "https://0-0.pro/v1/audio/transcriptions")!
+    private let transcriptionURL = URL(string: "http://118.89.199.50:8000/v1/audio/transcriptions")!
 
     @Published var transcribedText: String = ""
     @Published var isTranscribing = false

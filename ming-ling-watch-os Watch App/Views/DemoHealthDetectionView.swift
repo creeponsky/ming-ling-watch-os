@@ -342,7 +342,8 @@ struct DemoHealthDetectionView: View {
         // 立即触发DemoManager的久坐检测
         demoManager.triggerSedentaryDetection()
         
-        // 不立即显示步数记录界面，等待倒计时结束后由DemoManager控制
+        // 返回主页面，让倒计时在后台运行
+        dismiss()
     }
     
     // MARK: - 开始步数模拟

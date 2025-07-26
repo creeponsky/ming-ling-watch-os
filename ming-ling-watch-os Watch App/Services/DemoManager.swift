@@ -66,6 +66,26 @@ class DemoManager: ObservableObject {
     @Published var isStepMonitoringActive: Bool = false // 步数监测是否激活
     @Published var sedentaryCountdown: Int = 10 // 久坐检测倒计时
     
+    // 新增：倒计时目标时间持久化
+    var countdownTargetDate: Date? {
+        get {
+            UserDefaults.standard.object(forKey: "countdownTargetDate") as? Date
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "countdownTargetDate")
+        }
+    }
+    
+    // 新增：防止重复播放grow动画
+    var hasPlayedGrowAnimation: Bool {
+        get {
+            UserDefaults.standard.bool(forKey: "hasPlayedGrowAnimation")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "hasPlayedGrowAnimation")
+        }
+    }
+    
     // 新增：倒计时结束时间，用于计算准确的剩余时间
     private var countdownEndTime: Date?
     private var sedentaryEndTime: Date?
@@ -517,11 +537,7 @@ class DemoManager: ObservableObject {
         print("🎬 Demo: 倒计时重新计算完成 - 久坐: \(sedentaryCountdown)s, 步数: \(countdownSeconds)s, 监测状态: \(isStepMonitoringActive)")
     }
     
-    // MARK: - 完成步数目标（保留用于兼容性）
-    private func completeStepGoal() {
-        // 这个方法现在被 triggerIntimacyUpgrade 替代
-        triggerIntimacyUpgrade()
-    }
+
     
     // MARK: - 开始录音
     func startRecording() {
@@ -607,7 +623,7 @@ class DemoManager: ObservableObject {
     }
     
     // MARK: - 加载Demo数据
-    private func loadDemoData() {
+    func loadDemoData() {
         if let data = userDefaults.data(forKey: demoKey),
            let demoData = try? JSONDecoder().decode(DemoData.self, from: data) {
             isDemo = demoData.isDemo

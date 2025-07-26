@@ -487,8 +487,20 @@ struct DemoMainPetView: View {
     // MARK: - 开始进化动画
     private func startEvolutionAnimation() {
         print("🎬 开始进化动画流程")
+        
+        // 确保只播放一次
+        guard demoManager.shouldPlayEvolutionAnimation else {
+            print("⚠️ 不需要播放进化动画")
+            return
+        }
+        
         showEvolutionAnimation = true
         evolutionPhase = .initial
+        
+        // 清除播放标记
+        demoManager.shouldPlayEvolutionAnimation = false
+        demoManager.saveDemoData()
+        
         // 1. 2级宠物淡出
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             evolutionPhase = .fadeOut2nd

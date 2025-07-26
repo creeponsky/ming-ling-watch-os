@@ -14,7 +14,7 @@ class SpeechAPIService: ObservableObject {
         self.errorMessage = nil
         self.audioData = nil
 
-        guard let url = URL(string: "https://0-0.pro/v1/audio/speech") else {
+        guard let url = URL(string: "http://118.89.199.50:8000/v1/audio/speech") else {
             self.errorMessage = "Invalid URL"
             self.isRequesting = false
             return

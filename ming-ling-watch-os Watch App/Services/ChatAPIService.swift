@@ -28,7 +28,7 @@ class ChatAPIService: ObservableObject {
         self.errorMessage = nil
         self.responseContent = ""
 
-        guard let url = URL(string: "https://0-0.pro/v1/chat/completions") else {
+        guard let url = URL(string: "http://118.89.199.50:8000/v1/chat/completions") else {
             self.errorMessage = "Invalid URL"
             self.isRequesting = false
             return

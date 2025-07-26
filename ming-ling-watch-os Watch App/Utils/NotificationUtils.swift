@@ -1,4 +1,6 @@
 import SwiftUI
+import UserNotifications
+import WatchKit
 
 // MARK: - 通知工具类
 class NotificationUtils {
@@ -10,6 +12,48 @@ class NotificationUtils {
         
         var title: String {
             return self.rawValue
+        }
+    }
+    
+    // 安排本地通知
+    static func scheduleLocalNotification(at date: Date, title: String, body: String) {
+        print(" 安排本地通知: \(title) - \(body)")
+        
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        
+        // 计算时间间隔
+        let timeInterval = max(1, date.timeIntervalSinceNow)
+        print("⏰ 通知将在 \(timeInterval) 秒后发送")
+        
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: timeInterval, repeats: false)
+        let request = UNNotificationRequest(identifier: "stepDetection", content: content, trigger: trigger)
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ 安排通知失败: \(error)")
+            } else {
+                print("✅ 通知已安排")
+            }
+        }
+    }
+    
+    // 取消所有通知
+    static func cancelAllNotifications() {
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        print("🗑️ 已取消所有待发送通知")
+    }
+    
+    // 请求通知权限
+    static func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if granted {
+                print("✅ 通知权限已获取")
+            } else {
+                print("❌ 通知权限被拒绝: \(error?.localizedDescription ?? "")")
+            }
         }
     }
     
