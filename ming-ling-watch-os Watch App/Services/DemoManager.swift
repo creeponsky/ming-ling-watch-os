@@ -56,6 +56,10 @@ class DemoManager: ObservableObject {
     @Published var isStepMonitoringActive: Bool = false // 步数监测是否激活
     @Published var sedentaryCountdown: Int = 10 // 久坐检测倒计时
     
+    // 新增：倒计时结束时间，用于计算准确的剩余时间
+    private var countdownEndTime: Date?
+    private var sedentaryEndTime: Date?
+    
     private var stepCheckCount: Int = 0 // 步数检查次数
     
     private let demoKey = "demoData"
@@ -91,7 +95,11 @@ class DemoManager: ObservableObject {
         shouldPlayEvolutionAnimation = false
         countdownSeconds = 60
         isStepMonitoringActive = false
-        sedentaryCountdown = 10
+        // sedentaryCountdown 现在由新的倒计时逻辑管理
+        
+        // 重置倒计时结束时间
+        countdownEndTime = nil
+        sedentaryEndTime = nil
         
         // 停止所有计时器
         stopStepMonitoring()
@@ -131,27 +139,16 @@ class DemoManager: ObservableObject {
     func triggerSedentaryDetection() {
         demoState = .sedentaryTrigger
         stepCountBeforeReminder = demoProfile.stepCount
-        saveDemoData()
-        print("🎬 Demo: 开始久坐检测")
         
-        // 启动10秒倒计时
+        // 设置久坐检测倒计时结束时间（10秒后）
+        sedentaryEndTime = Date().addingTimeInterval(10)
         sedentaryCountdown = 10
-        let countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
-            guard let self = self else { return }
-            
-            self.sedentaryCountdown -= 1
-            print("🎬 Demo: 久坐检测倒计时 \(self.sedentaryCountdown) 秒")
-            
-            // 确保UI在主线程更新
-            DispatchQueue.main.async {
-                self.objectWillChange.send()
-            }
-            
-            if self.sedentaryCountdown <= 0 {
-                timer.invalidate()
-                self.enterStepDetection()
-            }
-        }
+        
+        saveDemoData()
+        print("🎬 Demo: 开始久坐检测，结束时间: \(sedentaryEndTime?.description ?? "nil")")
+        
+        // 启动倒计时更新Timer（每秒更新一次显示）
+        startSedentaryCountdownTimer()
         
         // 确保UI更新
         DispatchQueue.main.async {
@@ -164,7 +161,7 @@ class DemoManager: ObservableObject {
         demoState = .stepDetection
         showNotificationBar = false // 隐藏欢迎对话框
         isStepMonitoringActive = true
-        countdownSeconds = 60 // 重置倒计时为60秒
+        // countdownSeconds 现在由 startCountdownTimer 方法设置
         saveDemoData()
         print("🎬 Demo: 进入步数检测阶段")
         
@@ -316,23 +313,63 @@ class DemoManager: ObservableObject {
     
     // MARK: - 启动倒计时
     private func startCountdownTimer() {
+        // 设置倒计时结束时间（60秒后）
+        countdownEndTime = Date().addingTimeInterval(60)
+        countdownSeconds = 60
+        
+        print("🎬 Demo: 开始步数检测倒计时，结束时间: \(countdownEndTime?.description ?? "nil")")
+        
+        // 清除旧的Timer，避免重复启动
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        
+        // 启动新的Timer，每秒更新一次
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             
-            self.countdownSeconds -= 1
-            print("🎬 Demo: 倒计时 \(self.countdownSeconds) 秒")
+            // 计算剩余时间
+            let remainingTime = self.countdownEndTime?.timeIntervalSinceNow ?? 0
             
             // 确保UI在主线程更新
             DispatchQueue.main.async {
+                self.countdownSeconds = Int(remainingTime)
                 self.objectWillChange.send()
             }
             
-            if self.countdownSeconds <= 0 {
+            if remainingTime <= 0 {
                 print("🎬 Demo: 时间到，停止步数监测")
                 self.stopStepMonitoring()
                 // 时间到但没有完成目标，可以显示提示或重置
                 self.demoState = .mainPage
                 self.saveDemoData()
+            }
+        }
+    }
+    
+    // MARK: - 启动久坐倒计时更新Timer
+    private func startSedentaryCountdownTimer() {
+        // 清除旧的Timer，避免重复启动
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        
+        // 启动新的Timer，每秒更新一次
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // 计算剩余时间
+            let remainingTime = self.sedentaryEndTime?.timeIntervalSinceNow ?? 0
+            
+            // 确保UI在主线程更新
+            DispatchQueue.main.async {
+                self.sedentaryCountdown = Int(remainingTime)
+                self.objectWillChange.send()
+            }
+            
+            if remainingTime <= 0 {
+                print("🎬 Demo: 久坐检测时间到，进入步数检测")
+                self.enterStepDetection()
+                self.countdownTimer?.invalidate() // 停止Timer
+                self.countdownTimer = nil
             }
         }
     }
@@ -343,7 +380,49 @@ class DemoManager: ObservableObject {
         motionManager.stopStepCounting()
         countdownTimer?.invalidate()
         countdownTimer = nil
+        
+        // 清除倒计时结束时间
+        countdownEndTime = nil
+        sedentaryEndTime = nil
+        
         print("🎬 Demo: 步数监测已停止")
+    }
+    
+    // MARK: - 重新计算倒计时（页面重新出现时调用）
+    func recalculateCountdown() {
+        // 重新计算久坐检测倒计时
+        if let sedentaryEndTime = sedentaryEndTime, demoState == .sedentaryTrigger {
+            let remainingTime = sedentaryEndTime.timeIntervalSinceNow
+            sedentaryCountdown = max(0, Int(remainingTime))
+            
+            // 如果时间到了，立即进入步数检测
+            if remainingTime <= 0 {
+                print("🎬 Demo: 久坐检测时间到，进入步数检测")
+                enterStepDetection()
+            } else {
+                // 重新启动Timer
+                startSedentaryCountdownTimer()
+            }
+        }
+        
+        // 重新计算步数检测倒计时
+        if let countdownEndTime = countdownEndTime, demoState == .stepDetection {
+            let remainingTime = countdownEndTime.timeIntervalSinceNow
+            countdownSeconds = max(0, Int(remainingTime))
+            
+            // 如果时间到了，停止监测
+            if remainingTime <= 0 {
+                print("🎬 Demo: 步数检测时间到，停止监测")
+                stopStepMonitoring()
+                demoState = .mainPage
+                saveDemoData()
+            } else {
+                // 重新启动Timer
+                startCountdownTimer()
+            }
+        }
+        
+        print("🎬 Demo: 倒计时重新计算完成 - 久坐: \(sedentaryCountdown)s, 步数: \(countdownSeconds)s")
     }
     
     // MARK: - 完成步数目标（保留用于兼容性）
@@ -423,7 +502,9 @@ class DemoManager: ObservableObject {
             shouldPlayEvolutionAnimation: shouldPlayEvolutionAnimation,
             countdownSeconds: countdownSeconds,
             isStepMonitoringActive: isStepMonitoringActive,
-            sedentaryCountdown: sedentaryCountdown
+            sedentaryCountdown: sedentaryCountdown,
+            countdownEndTime: countdownEndTime,
+            sedentaryEndTime: sedentaryEndTime
         )
         
         if let data = try? JSONEncoder().encode(demoData) {
@@ -446,6 +527,8 @@ class DemoManager: ObservableObject {
             countdownSeconds = demoData.countdownSeconds
             isStepMonitoringActive = demoData.isStepMonitoringActive
             sedentaryCountdown = demoData.sedentaryCountdown
+            countdownEndTime = demoData.countdownEndTime
+            sedentaryEndTime = demoData.sedentaryEndTime
             
             print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation), countdownSeconds=\(countdownSeconds), isStepMonitoringActive=\(isStepMonitoringActive), sedentaryCountdown=\(sedentaryCountdown)")
         }
@@ -470,6 +553,8 @@ private struct DemoData: Codable {
     let countdownSeconds: Int
     let isStepMonitoringActive: Bool
     let sedentaryCountdown: Int
+    let countdownEndTime: Date?
+    let sedentaryEndTime: Date?
 }
 
 // MARK: - Demo工具扩展
@@ -491,8 +576,6 @@ extension DemoManager {
             return "亲密度升级阶段"
         case .voiceInteraction:
             return "语音交互阶段"
-        case .voiceCompleted:
-            return "语音完成阶段"
         case .completed:
             return "Demo完成"
         }

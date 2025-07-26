@@ -151,7 +151,7 @@ struct DemoHealthDetectionView: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(demoManager.demoState != .mainPage && demoManager.demoState != .voiceInteraction && demoManager.demoState != .voiceCompleted || demoManager.demoState == .sedentaryTrigger)
+        .disabled(demoManager.demoState != .mainPage && demoManager.demoState != .voiceInteraction || demoManager.demoState == .sedentaryTrigger)
     }
     
     // MARK: - 步数记录显示
@@ -253,6 +253,9 @@ struct DemoHealthDetectionView: View {
     
     // MARK: - 设置视图
     private func setupView() {
+        // 重新计算倒计时，确保准确性
+        demoManager.recalculateCountdown()
+        
         // 如果已经在步数检测阶段，显示步数记录
         if demoManager.demoState == .stepDetection {
             showStepCount = true

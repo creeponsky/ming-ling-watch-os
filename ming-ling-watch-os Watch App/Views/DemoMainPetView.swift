@@ -46,13 +46,13 @@ struct DemoMainPetView: View {
                         bottomControlArea
                     }
                     .offset(x: (demoManager.demoProfile.intimacyGrade < 3 &&
-                               (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted)) ? swipeOffset : 0)
+                               (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction)) ? swipeOffset : 0)
                     .opacity((demoManager.demoProfile.intimacyGrade < 3 &&
-                             (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted)) ? max(0.0, 1.0 - abs(swipeOffset) / 200.0) : 1.0)
+                             (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction)) ? max(0.0, 1.0 - abs(swipeOffset) / 200.0) : 1.0)
 
                     // 健康检测页面预览（左滑时显示）
                     if isSwipeActive && swipeOffset < -50 && demoManager.demoProfile.intimacyGrade < 3 &&
-                       (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) {
+                       (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction) {
                         DemoHealthDetectionView()
                             .offset(x: geometry.size.width + swipeOffset)
                             .opacity(abs(swipeOffset) / 200.0)
@@ -71,7 +71,7 @@ struct DemoMainPetView: View {
                     .onChanged { value in
                         // 只处理左滑手势，且亲密度小于3级，且在允许的状态下，且欢迎对话框未激活
                         if value.translation.width < 0 && demoManager.demoProfile.intimacyGrade < 3 &&
-                           (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) && !isWelcomeActive {
+                           (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction) && !isWelcomeActive {
                             isSwipeActive = true
                             swipeOffset = value.translation.width
                             print("🔄 左滑手势: translation.width = \(value.translation.width)")
@@ -87,7 +87,7 @@ struct DemoMainPetView: View {
                             if isWelcomeActive && demoManager.demoState == .mainPage {
                                 print("👋 关闭欢迎对话框")
                                 dismissWelcome()
-                            } else if (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) && demoManager.demoProfile.intimacyGrade < 3 {
+                            } else if (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction) && demoManager.demoProfile.intimacyGrade < 3 {
                                 print("✅ 状态满足条件，触发导航")
                                 // 直接触发导航，让navigationDestination处理过渡
                                 showHealthDetection = true
@@ -140,9 +140,9 @@ struct DemoMainPetView: View {
             .onChange(of: showHealthDetection) { newValue in
                 print("🔗 showHealthDetection 变化: \(newValue)")
             }
-            .navigationDestination(isPresented: $showVoiceCompleted) {
-                DemoVoiceCompletedView()
-            }
+            // .navigationDestination(isPresented: $showVoiceCompleted) {
+                // DemoVoiceCompletedView()
+            // }
         .navigationBarHidden(true)
         .navigationBarBackButtonHidden(true)
     }
@@ -313,14 +313,14 @@ struct DemoMainPetView: View {
             }
 
             // 语音完成阶段的按钮
-            if demoManager.demoState == .voiceCompleted && !showEvolutionAnimation {
-                voiceCompletedButtons
-                    .opacity(1.0)
-                    .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
-            }
+            // if demoManager.demoState == .voiceCompleted && !showEvolutionAnimation {
+            //     voiceCompletedButtons
+            //         .opacity(1.0)
+            //         .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
+            // }
 
             // 退出按钮
-            if demoManager.canExitDemo && demoManager.demoState != .voiceCompleted && !showEvolutionAnimation {
+            if demoManager.canExitDemo && !showEvolutionAnimation {
                 Button(action: {
                     demoManager.exitDemo()
                 }) {
@@ -430,9 +430,9 @@ struct DemoMainPetView: View {
             withAnimation {
                 demoManager.showNotificationBar = false
             }
-        case .voiceCompleted:
-            // 显示语音完成页面
-            showVoiceCompleted = true
+        // case .voiceCompleted:
+        //     // 显示语音完成页面
+        //     showVoiceCompleted = true
         default:
             break
         }
