@@ -5,10 +5,7 @@ struct DemoHealthDetectionView: View {
     @StateObject private var demoManager = DemoManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showStepCount = false
-    @State private var currentStepCount = 0
-    @State private var stepTimer: Timer?
-    @State private var countdownTimer: Timer?
-    @State private var countdownSeconds = 10
+
     
     var body: some View {
         ScrollView {
@@ -43,7 +40,10 @@ struct DemoHealthDetectionView: View {
             setupView()
         }
         .onDisappear {
-            cleanupTimer()
+            // 不再需要清理计时器，由DemoManager管理
+        }
+        .onChange(of: demoManager.demoState) { _ in
+            onDemoStateChanged()
         }
     }
     
@@ -136,12 +136,12 @@ struct DemoHealthDetectionView: View {
                 )
                 
                 // 倒计时显示
-                if countdownSeconds < 10 {
+                if (demoManager.isStepMonitoringActive && demoManager.countdownSeconds < 60) || demoManager.demoState == .sedentaryTrigger {
                     VStack {
                         Spacer()
                         HStack {
                             Spacer()
-                            Text("\(countdownSeconds)s")
+                            Text(demoManager.demoState == .sedentaryTrigger ? "\(demoManager.sedentaryCountdown)s" : "\(demoManager.countdownSeconds)s")
                                 .font(.caption)
                                 .fontWeight(.bold)
                                 .foregroundColor(.green)
@@ -163,7 +163,7 @@ struct DemoHealthDetectionView: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(demoManager.demoState != .mainPage && demoManager.demoState != .voiceInteraction && demoManager.demoState != .voiceCompleted)
+        .disabled(demoManager.demoState != .mainPage && demoManager.demoState != .voiceInteraction && demoManager.demoState != .voiceCompleted || demoManager.demoState == .sedentaryTrigger)
     }
     
     // MARK: - 步数记录显示
@@ -287,7 +287,15 @@ struct DemoHealthDetectionView: View {
         // 如果已经在步数检测阶段，显示步数记录
         if demoManager.demoState == .stepDetection {
             showStepCount = true
-            startStepCountSimulation()
+        }
+    }
+    
+    // MARK: - 监听Demo状态变化
+    private func onDemoStateChanged() {
+        if demoManager.demoState == .stepDetection && !showStepCount {
+            withAnimation {
+                showStepCount = true
+            }
         }
     }
     
@@ -298,42 +306,13 @@ struct DemoHealthDetectionView: View {
         // 立即触发DemoManager的久坐检测
         demoManager.triggerSedentaryDetection()
         
-        // 开始倒计时
-        countdownSeconds = 10
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            countdownSeconds -= 1
-            print("🔘 倒计时: \(countdownSeconds)秒")
-            
-            if countdownSeconds <= 0 {
-                countdownTimer?.invalidate()
-                countdownTimer = nil
-                
-                print("🔘 倒计时结束，显示步数记录")
-                withAnimation {
-                    showStepCount = true
-                }
-                startStepCountSimulation()
-            }
-        }
+        // 不立即显示步数记录界面，等待倒计时结束后由DemoManager控制
     }
     
     // MARK: - 开始步数模拟
     private func startStepCountSimulation() {
-        currentStepCount = 0
-        
-        // 不再自动增加步数，等待用户实际走路
-        // 这里只是显示界面，实际的步数检测由DemoManager处理
+        // 这个方法现在由DemoManager处理，这里只是显示界面
         print("🎬 步数检测界面已显示，等待DemoManager处理")
-    }
-    
-
-    
-    // MARK: - 清理计时器
-    private func cleanupTimer() {
-        stepTimer?.invalidate()
-        stepTimer = nil
-        countdownTimer?.invalidate()
-        countdownTimer = nil
     }
 }
 

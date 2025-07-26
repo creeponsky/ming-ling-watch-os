@@ -170,7 +170,7 @@ struct DemoMainPetView: View {
             // 使用GIF动画或静态图片
             if showInteractionAnimation {
                 // 点击交互动画
-                GIFAnimationView(gifName: "GIFs/mumu/happy/\(demoManager.demoProfile.intimacyGrade)")
+                GIFAnimationView(gifName: "GIFs/mumu/touch/toutch-\(demoManager.demoProfile.intimacyGrade)")
                     .frame(width: 150, height: 150)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {

@@ -64,8 +64,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
@@ -111,8 +111,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
@@ -154,8 +154,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
@@ -197,8 +197,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
@@ -236,8 +236,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(

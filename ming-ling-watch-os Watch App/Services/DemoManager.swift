@@ -53,9 +53,19 @@ class DemoManager: ObservableObject {
     @Published var isRecording: Bool = false
     @Published var hasShownWelcome: Bool = false
     @Published var shouldPlayEvolutionAnimation: Bool = false
+    @Published var countdownSeconds: Int = 60 // 60秒倒计时
+    @Published var isStepMonitoringActive: Bool = false // 步数监测是否激活
+    @Published var sedentaryCountdown: Int = 10 // 久坐检测倒计时
+    
+    private var stepCheckCount: Int = 0 // 步数检查次数
+    private var isInitialStepSet: Bool = false // 是否已设置真正的初始步数
     
     private let demoKey = "demoData"
     private let userDefaults = UserDefaults.standard
+    private let motionManager = MotionManager()
+    private let healthKitManager = HealthKitManager.shared
+    private var countdownTimer: Timer?
+    private var initialStepCount: Int = 0
     
     private init() {
         loadDemoData()
@@ -80,6 +90,13 @@ class DemoManager: ObservableObject {
         showNotificationBar = false
         isRecording = false
         hasShownWelcome = false
+        shouldPlayEvolutionAnimation = false
+        countdownSeconds = 60
+        isStepMonitoringActive = false
+        sedentaryCountdown = 10
+        
+        // 停止所有计时器
+        stopStepMonitoring()
         clearDemoData()
         print("🎬 Demo结束")
     }
@@ -119,9 +136,28 @@ class DemoManager: ObservableObject {
         saveDemoData()
         print("🎬 Demo: 开始久坐检测")
         
-        // 10秒后进入步数检测阶段
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            self.enterStepDetection()
+        // 启动10秒倒计时
+        sedentaryCountdown = 10
+        let countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard let self = self else { return }
+            
+            self.sedentaryCountdown -= 1
+            print("🎬 Demo: 久坐检测倒计时 \(self.sedentaryCountdown) 秒")
+            
+            // 确保UI在主线程更新
+            DispatchQueue.main.async {
+                self.objectWillChange.send()
+            }
+            
+            if self.sedentaryCountdown <= 0 {
+                timer.invalidate()
+                self.enterStepDetection()
+            }
+        }
+        
+        // 确保UI更新
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
         }
     }
     
@@ -129,22 +165,26 @@ class DemoManager: ObservableObject {
     private func enterStepDetection() {
         demoState = .stepDetection
         showNotificationBar = false // 隐藏欢迎对话框
+        isStepMonitoringActive = true
+        countdownSeconds = 60 // 重置倒计时为60秒
         saveDemoData()
         print("🎬 Demo: 进入步数检测阶段")
         
         // 发送久坐提醒通知
         sendSedentaryReminder()
         
-        // 10秒后自动完成步数目标（模拟用户走路）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-            self.triggerIntimacyUpgrade()
+        // 开始实时步数监测
+        startRealStepMonitoring()
+        
+        // 确保UI更新，触发界面切换
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
         }
     }
     
     // MARK: - 触发亲密度升级
     private func triggerIntimacyUpgrade() {
         // 增加步数和亲密度
-        demoProfile.stepCount += 20
         demoProfile.addIntimacy(30) // 升级到3级
         
         demoState = .intimacyUpgrade
@@ -161,6 +201,134 @@ class DemoManager: ObservableObject {
             self.saveDemoData()
             print("🎬 Demo: 进入语音交互阶段")
         }
+    }
+    
+    // MARK: - 开始真实步数监测
+    private func startRealStepMonitoring() {
+        print("🎬 Demo: 开始真实步数监测")
+        
+        // 重置步数为0，因为我们只关心增量
+        demoProfile.stepCount = 0
+        stepCheckCount = 0
+        isInitialStepSet = false
+        
+        // 记录开始监测的时间
+        let startTime = Date()
+        print("🎬 Demo: 开始监测时间: \(startTime)")
+        
+        // 延迟3秒后获取初始步数，确保HealthKit数据稳定
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            let now = Date()
+            print("🎬 Demo: 获取初始步数时间: \(now)")
+            
+            // 获取今日总步数作为初始值
+            self?.healthKitManager.getSteps(from: Calendar.current.startOfDay(for: Date()), to: now) { totalSteps in
+                DispatchQueue.main.async {
+                    self?.initialStepCount = totalSteps
+                    print("🎬 Demo: 设置初始步数: \(totalSteps) (今日总步数)")
+                    
+                    // 启动步数监测（只使用MotionManager，不使用定时器）
+                    self?.motionManager.startStepCounting { currentTotalSteps in
+                        self?.handleStepCountUpdate(currentTotalSteps)
+                    }
+                    
+                    // 启动60秒倒计时
+                    self?.startCountdownTimer()
+                    
+                    // 确保UI更新
+                    self?.objectWillChange.send()
+                }
+            }
+        }
+    }
+    
+    // MARK: - 处理步数更新
+    private func handleStepCountUpdate(_ currentTotalSteps: Int) {
+        guard isStepMonitoringActive else { return }
+        
+        stepCheckCount += 1
+        
+        // 计算从开始监测后的步数增量
+        let stepIncrease = currentTotalSteps - initialStepCount
+        
+        print("🎬 Demo: 步数处理 - 当前总步数: \(currentTotalSteps), 初始步数: \(initialStepCount), 计算增量: \(stepIncrease), 检查次数: \(stepCheckCount)")
+        
+        // 验证步数增量的合理性（防止异常数据）
+        if stepIncrease < 0 {
+            print("🎬 Demo: 步数异常，增量为负数: \(stepIncrease)，忽略此次更新")
+            return
+        }
+        
+        // 如果增量过大且是前几次检查，重新设置初始步数
+        if stepIncrease > 50 && stepCheckCount <= 5 && !isInitialStepSet {
+            print("🎬 Demo: 前\(stepCheckCount)次检查增量过大(\(stepIncrease))，重新设置初始步数为当前步数")
+            initialStepCount = currentTotalSteps
+            isInitialStepSet = true
+            demoProfile.stepCount = 0
+            print("🎬 Demo: 重新设置初始步数: \(initialStepCount)")
+            return
+        }
+        
+        // 如果增量过大且已经设置过初始步数，忽略
+        if stepIncrease > 50 {
+            print("🎬 Demo: 步数增量异常过大: \(stepIncrease)，忽略此次更新")
+            return
+        }
+        
+        // 只有当步数有变化时才更新UI，并且确保不会出现负数
+        let newStepCount = max(0, stepIncrease)
+        if newStepCount != demoProfile.stepCount {
+            demoProfile.stepCount = newStepCount
+            print("🎬 Demo: 步数更新成功 - 新增量: \(newStepCount)")
+            
+            // 确保UI在主线程更新
+            DispatchQueue.main.async {
+                self.objectWillChange.send()
+            }
+        } else {
+            print("🎬 Demo: 步数无变化，跳过更新")
+        }
+        
+        // 检查是否达到目标（20步）
+        if newStepCount >= 20 {
+            print("🎬 Demo: 达到步数目标！")
+            stopStepMonitoring()
+            triggerIntimacyUpgrade()
+        }
+    }
+    
+
+    
+    // MARK: - 启动倒计时
+    private func startCountdownTimer() {
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            self.countdownSeconds -= 1
+            print("🎬 Demo: 倒计时 \(self.countdownSeconds) 秒")
+            
+            // 确保UI在主线程更新
+            DispatchQueue.main.async {
+                self.objectWillChange.send()
+            }
+            
+            if self.countdownSeconds <= 0 {
+                print("🎬 Demo: 时间到，停止步数监测")
+                self.stopStepMonitoring()
+                // 时间到但没有完成目标，可以显示提示或重置
+                self.demoState = .mainPage
+                self.saveDemoData()
+            }
+        }
+    }
+    
+    // MARK: - 停止步数监测
+    private func stopStepMonitoring() {
+        isStepMonitoringActive = false
+        motionManager.stopStepCounting()
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        print("🎬 Demo: 步数监测已停止")
     }
     
     // MARK: - 完成步数目标（保留用于兼容性）
@@ -204,7 +372,7 @@ class DemoManager: ObservableObject {
         SystemNotificationManager.shared.sendSuggestionNotification(
             for: "木", // Demo中固定为木属性
             taskType: .sedentary,
-            delay: 1
+            delay: 0
         )
     }
     
@@ -216,7 +384,7 @@ class DemoManager: ObservableObject {
         SystemNotificationManager.shared.sendCompletionNotification(
             for: "木", // Demo中固定为木属性
             taskType: .sedentary,
-            delay: 1
+            delay: 0
         )
     }
     
@@ -237,7 +405,10 @@ class DemoManager: ObservableObject {
             notificationMessage: notificationMessage,
             stepCountBeforeReminder: stepCountBeforeReminder,
             hasShownWelcome: hasShownWelcome,
-            shouldPlayEvolutionAnimation: shouldPlayEvolutionAnimation
+            shouldPlayEvolutionAnimation: shouldPlayEvolutionAnimation,
+            countdownSeconds: countdownSeconds,
+            isStepMonitoringActive: isStepMonitoringActive,
+            sedentaryCountdown: sedentaryCountdown
         )
         
         if let data = try? JSONEncoder().encode(demoData) {
@@ -257,8 +428,11 @@ class DemoManager: ObservableObject {
             stepCountBeforeReminder = demoData.stepCountBeforeReminder
             hasShownWelcome = demoData.hasShownWelcome
             shouldPlayEvolutionAnimation = demoData.shouldPlayEvolutionAnimation
+            countdownSeconds = demoData.countdownSeconds
+            isStepMonitoringActive = demoData.isStepMonitoringActive
+            sedentaryCountdown = demoData.sedentaryCountdown
             
-            print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation)")
+            print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation), countdownSeconds=\(countdownSeconds), isStepMonitoringActive=\(isStepMonitoringActive), sedentaryCountdown=\(sedentaryCountdown)")
         }
     }
     
@@ -278,6 +452,9 @@ private struct DemoData: Codable {
     let stepCountBeforeReminder: Int
     let hasShownWelcome: Bool
     let shouldPlayEvolutionAnimation: Bool
+    let countdownSeconds: Int
+    let isStepMonitoringActive: Bool
+    let sedentaryCountdown: Int
 }
 
 // MARK: - Demo工具扩展
