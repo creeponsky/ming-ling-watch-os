@@ -22,7 +22,7 @@ struct HealthDashboardPageView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Demo模块 - 移到最前面
-                demoSection
+                demoAndVoiceSection
                 
                 // 问候语和压力状态
                 greetingSection
@@ -32,9 +32,6 @@ struct HealthDashboardPageView: View {
 
                 // 通知测试模块
                 notificationTestSection
-
-                // 音频识别模块
-                audioRecordingSection
 
                 // 设置入口
                 settingsSection
