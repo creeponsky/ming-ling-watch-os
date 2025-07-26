@@ -86,6 +86,16 @@ class DemoManager: ObservableObject {
         }
     }
     
+    // 新增：控制是否可以显示3级gif
+    var canShowLevel3Gif: Bool {
+        get {
+            UserDefaults.standard.bool(forKey: "canShowLevel3Gif")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "canShowLevel3Gif")
+        }
+    }
+    
     // 新增：倒计时结束时间，用于计算准确的剩余时间
     private var countdownEndTime: Date?
     private var sedentaryEndTime: Date?
@@ -614,7 +624,9 @@ class DemoManager: ObservableObject {
             countdownEndTime: countdownEndTime,
             sedentaryEndTime: sedentaryEndTime,
             initialStepCount: initialStepCount,
-            stepCheckCount: stepCheckCount
+            stepCheckCount: stepCheckCount,
+            hasPlayedGrowAnimation: hasPlayedGrowAnimation,
+            canShowLevel3Gif: canShowLevel3Gif
         )
         
         if let data = try? JSONEncoder().encode(demoData) {
@@ -641,8 +653,10 @@ class DemoManager: ObservableObject {
             sedentaryEndTime = demoData.sedentaryEndTime
             initialStepCount = demoData.initialStepCount
             stepCheckCount = demoData.stepCheckCount
+            hasPlayedGrowAnimation = demoData.hasPlayedGrowAnimation
+            canShowLevel3Gif = demoData.canShowLevel3Gif
             
-            print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation), countdownSeconds=\(countdownSeconds), isStepMonitoringActive=\(isStepMonitoringActive), sedentaryCountdown=\(sedentaryCountdown), stepGoalCompleted=\(demoProfile.stepGoalCompleted), hasCompletedDemo=\(demoProfile.hasCompletedDemo)")
+            print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation), countdownSeconds=\(countdownSeconds), isStepMonitoringActive=\(isStepMonitoringActive), sedentaryCountdown=\(sedentaryCountdown), stepGoalCompleted=\(demoProfile.stepGoalCompleted), hasCompletedDemo=\(demoProfile.hasCompletedDemo), hasPlayedGrowAnimation=\(hasPlayedGrowAnimation), canShowLevel3Gif=\(canShowLevel3Gif)")
         }
     }
     
@@ -670,6 +684,51 @@ class DemoManager: ObservableObject {
             self.objectWillChange.send()
         }
     }
+    
+    // MARK: - 步数目标完成
+    func onStepGoalCompleted() {
+        print("🎉 步数目标完成！")
+        
+        // 停止步数监听
+        isStepMonitoringActive = false
+        
+        // 标记步数目标完成
+        demoProfile.stepGoalCompleted = true
+        
+        // 防止重复播放grow动画
+        if !hasPlayedGrowAnimation {
+            print("🎬 安排播放grow动画")
+            shouldPlayEvolutionAnimation = true
+            hasPlayedGrowAnimation = true
+            // 注意：这里不设置canShowLevel3Gif，等动画播放完成后再设置
+        }
+        
+        // 回到主页面
+        demoState = .mainPage
+        
+        // 保存状态
+        saveDemoData()
+        
+        print("✅ 步数目标完成处理完毕")
+    }
+    
+    // MARK: - grow动画播放完成
+    func onGrowAnimationCompleted() {
+        print("🎬 grow动画播放完成，允许显示3级gif")
+        canShowLevel3Gif = true
+        saveDemoData()
+    }
+    
+    // MARK: - 重置Demo状态
+    func resetDemoState() {
+        exitDemo()
+        startDemo()
+        
+        // 清除倒计时相关状态
+        countdownTargetDate = nil
+        hasPlayedGrowAnimation = false
+        canShowLevel3Gif = false // 重置3级gif显示权限
+    }
 }
 
 // MARK: - Demo数据存储模型
@@ -689,6 +748,8 @@ private struct DemoData: Codable {
     let sedentaryEndTime: Date?
     let initialStepCount: Int
     let stepCheckCount: Int
+    let hasPlayedGrowAnimation: Bool
+    let canShowLevel3Gif: Bool
 }
 
 // MARK: - Demo工具扩展

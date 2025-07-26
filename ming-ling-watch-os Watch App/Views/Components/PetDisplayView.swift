@@ -2,10 +2,23 @@ import SwiftUI
 
 // MARK: - 宠物显示视图
 struct PetDisplayView: View {
-    @StateObject private var demoManager = DemoManager.shared
     @Binding var showInteractionAnimation: Bool
+    var forceGrade: Int? = nil // 新增：强制显示特定等级
+    
+    @StateObject private var demoManager = DemoManager.shared
     
     var body: some View {
+        // 获取当前应该显示的等级
+        let displayGrade: Int = {
+            if demoManager.demoProfile.intimacyGrade >= 3 && !demoManager.canShowLevel3Gif {
+                // 如果亲密度已达到3级但还不能显示3级gif，显示2级
+                return 2
+            } else {
+                // 否则显示当前亲密度等级
+                return demoManager.demoProfile.intimacyGrade
+            }
+        }()
+        
         VStack {
             // 使用GIF动画或静态图片
             if showInteractionAnimation {
@@ -22,10 +35,10 @@ struct PetDisplayView: View {
             } else {
                 // 正常状态显示 - 使用idle GIF
                 Group {
-                    if demoManager.demoProfile.intimacyGrade >= 2 {
+                    if displayGrade >= 2 {
                         // 2级和3级显示idle GIF
                         GIFAnimationView(
-                            gifName: PetUtils.getMumuIdleGIFName(intimacyGrade: demoManager.demoProfile.intimacyGrade),
+                            gifName: PetUtils.getMumuIdleGIFName(intimacyGrade: displayGrade),
                             isPlaying: true
                         )
                         .frame(width: 150, height: 150)

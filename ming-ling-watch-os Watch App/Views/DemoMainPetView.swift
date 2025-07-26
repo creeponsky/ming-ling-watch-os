@@ -12,6 +12,8 @@ struct DemoMainPetView: View {
     
 
     @State private var showInteractionAnimation = false
+    // 新增：防止重复触发touch动画
+    @State private var touchAnimationCooldown = false
     @State private var showHealthDetection = false
     @State private var showVoiceCompleted = false
     @State private var showEvolutionAnimation = false
@@ -22,6 +24,8 @@ struct DemoMainPetView: View {
     @State private var recordingState: RecordingState = .idle // 新增：录音状态
     @State private var isLongPressing = false // 新增：长按状态
     @State private var shouldShowMainContent = false // 新增：控制主内容首次显示
+    // 新增：控制grow动画前的显示状态
+    @State private var isWaitingForGrowAnimation = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -89,15 +93,15 @@ struct DemoMainPetView: View {
                                                 stopVoiceRecording()
                                             } else if isLongPressing && recordingState == .idle {
                                                 // 如果是短按（没有开始录音），触发交互动画（只有亲密度3才有touch动画）
-                                                if demoManager.demoProfile.intimacyGrade >= 3 {
-                                                    showInteractionAnimation = true
+                                                if demoManager.demoProfile.intimacyGrade >= 3 && !touchAnimationCooldown {
+                                                    triggerTouchAnimation()
                                                 }
                                             }
                                             isLongPressing = false
                                         } else {
                                             // 非语音交互状态，只有亲密度3才能触发touch动画
-                                            if demoManager.demoProfile.intimacyGrade >= 3 {
-                                                showInteractionAnimation = true
+                                            if demoManager.demoProfile.intimacyGrade >= 3 && !touchAnimationCooldown {
+                                                triggerTouchAnimation()
                                             }
                                             isLongPressing = false
                                         }
@@ -455,9 +459,9 @@ struct DemoMainPetView: View {
             
             // 如果标记需要播放进化动画，启动动画
             if demoManager.shouldPlayEvolutionAnimation {
+                print("🎬 语音交互状态检测到需要播放grow动画")
+                isWaitingForGrowAnimation = true
                 startEvolutionAnimation()
-                demoManager.shouldPlayEvolutionAnimation = false
-                demoManager.saveDemoData()
             }
         case .mainPage:
             // 如果回到主页面，检查是否需要显示欢迎对话框
@@ -469,6 +473,13 @@ struct DemoMainPetView: View {
                 // 直接显示主内容（比如从其他页面返回）
                 shouldShowMainContent = true
                 isWelcomeActive = false
+            }
+            
+            // 检查是否需要播放grow动画
+            if demoManager.shouldPlayEvolutionAnimation && demoManager.demoProfile.intimacyGrade >= 3 {
+                print("🎬 主页面状态检测到需要播放grow动画")
+                isWaitingForGrowAnimation = true
+                startEvolutionAnimation()
             }
         case .sedentaryTrigger, .stepDetection:
             // 久坐检测和步数检测状态，确保主内容显示
@@ -537,7 +548,10 @@ struct DemoMainPetView: View {
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                                             withAnimation(.easeInOut(duration: 0.5)) {
                                                 showEvolutionAnimation = false
+                                                isWaitingForGrowAnimation = false // 重置等待状态
                                             }
+                                            // 通知DemoManager grow动画播放完成
+                                            DemoManager.shared.onGrowAnimationCompleted()
                                             print("🎬 进化动画结束，恢复正常显示")
                                         }
                                     }
@@ -568,6 +582,18 @@ struct DemoMainPetView: View {
             }
         }
         print("👋 欢迎对话框已关闭，主内容开始淡入")
+    }
+
+    // MARK: - 触发Touch动画
+    private func triggerTouchAnimation() {
+        print("👆 触发touch动画")
+        showInteractionAnimation = true
+        
+        // 2秒后自动停止动画（确保只播放一次）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            showInteractionAnimation = false
+            print("👆 touch动画结束")
+        }
     }
 
 
