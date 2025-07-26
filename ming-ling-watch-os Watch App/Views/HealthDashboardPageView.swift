@@ -14,16 +14,18 @@ struct HealthDashboardPageView: View {
     @StateObject private var speechAPIService = SpeechAPIService.shared
     @StateObject private var audioPlayerManager = AudioPlayerManager.shared
     @StateObject private var demoManager = DemoManager.shared
-    
+
     @State private var isDelayedNotification: Bool = false
     @State private var isRecording = false
+    @State private var isLongPressing = false // 用于新按钮的UI状态
+    @State private var isProcessingConversation = false // 用于跟踪整个对话流程的状态
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Demo模块 - 移到最前面
-                demoSection
-                
+                // Demo模块+音频识别模块 - 移到最前面
+                demoAndVoiceSection
+
                 // 问候语和压力状态
                 greetingSection
 
@@ -33,8 +35,8 @@ struct HealthDashboardPageView: View {
                 // 通知测试模块
                 notificationTestSection
 
-                // 音频识别模块
-                audioRecordingSection
+                // 完整对话流程模块
+                conversationChainSection
 
                 // 设置入口
                 settingsSection
@@ -332,160 +334,206 @@ struct HealthDashboardPageView: View {
         }
         .onChange(of: speechAPIService.audioData) { newData in
             if let data = newData {
-                audioPlayerManager.playAudio(data: data)
-            }
-        }
-    }// MARK: - 综合模块：Demo + 语音识别
-private var demoAndVoiceSection: some View {
-    VStack(spacing: 32) {
-
-        // MARK: - Demo模块
-        VStack(spacing: 16) {
-            Text("Demo体验")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-
-            VStack(spacing: 12) {
-                // Demo状态显示
-                if demoManager.isDemo {
-                    HStack {
-                        Image(systemName: "play.circle.fill")
-                            .foregroundColor(.green)
-
-                        VStack(alignment: .leading) {
-                            Text("Demo进行中")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                        }
-
-                        Spacer()
-
-                        if demoManager.canExitDemo {
-                            Button("退出") {
-                                demoManager.exitDemo()
-                            }
-                            .font(.caption2)
-                            .foregroundColor(.red)
+                // 如果是对话流程的一部分，则播放并处理后续逻辑
+                if isProcessingConversation {
+                    audioPlayerManager.playAudio(data: data) {
+                        DispatchQueue.main.async {
+                            self.isProcessingConversation = false
+                            print("✅ 对话流程结束")
                         }
                     }
-                    .padding(.horizontal, 4)
+                } else {
+                    // 否则，仅播放
+                    audioPlayerManager.playAudio(data: data) {}
                 }
+            }
+        }
+        .onChange(of: transcriptionAPIService.transcribedText) { newText in
+            if !newText.isEmpty && isProcessingConversation {
+                print("📝 转录完成: \(newText)")
+                chatAPIService.sendMessage(content: newText)
+            }
+        }
+        .onChange(of: chatAPIService.responseContent) { newContent in
+            if !newContent.isEmpty && isProcessingConversation {
+                print("🤖 AI回复: \(newContent)")
+                speechAPIService.generateSpeech(text: newContent)
+            }
+        }
+        .onChange(of: transcriptionAPIService.errorMessage) { error in
+            if let error = error {
+                print("❌ 转录失败: \(error)")
+                isProcessingConversation = false
+            }
+        }
+        .onChange(of: chatAPIService.errorMessage) { error in
+            if let error = error {
+                print("❌ 获取AI回复失败: \(error)")
+                isProcessingConversation = false
+            }
+        }
+        .onChange(of: speechAPIService.errorMessage) { error in
+            if let error = error {
+                print("❌ 语音合成失败: \(error)")
+                isProcessingConversation = false
+            }
+        }
+    }
 
-                // Demo按钮
-                Button(action: {
+    // MARK: - 综合模块：Demo + 语音识别
+    private var demoAndVoiceSection: some View {
+        VStack(spacing: 32) {
+
+            // MARK: - Demo模块
+            VStack(spacing: 16) {
+                Text("Demo体验")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+                VStack(spacing: 12) {
+                    // Demo状态显示
                     if demoManager.isDemo {
-                        demoManager.resetDemo()
-                    } else {
-                        demoManager.startDemo()
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: demoManager.isDemo ? "arrow.clockwise" : "play.fill")
-                            .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                            .font(.title2)
+                        HStack {
+                            Image(systemName: "play.circle.fill")
+                                .foregroundColor(.green)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(demoManager.isDemo ? "重置Demo" : "开始Demo")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            VStack(alignment: .leading) {
+                                Text("Demo进行中")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            }
 
-                            Text(demoManager.isDemo ? "重新开始Demo流程" : "体验完整功能演示")
-                                .font(.caption)
-                                .foregroundColor(demoManager.isDemo ? PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7) : .blue.opacity(0.9))
+                            Spacer()
+
+                            if demoManager.canExitDemo {
+                                Button("退出") {
+                                    demoManager.exitDemo()
+                                }
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                            }
                         }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
-                            .font(.caption)
+                        .padding(.horizontal, 4)
                     }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.blue.opacity(0.2))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
-                            )
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-        }
 
-        // MARK: - 语音识别模块
-        VStack(spacing: 16) {
-            Text("语音识别")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                    // Demo按钮
+                    Button(action: {
+                        if demoManager.isDemo {
+                            demoManager.resetDemo()
+                        } else {
+                            demoManager.startDemo()
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: demoManager.isDemo ? "arrow.clockwise" : "play.fill")
+                                .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                                .font(.title2)
 
-            VStack(spacing: 12) {
-                Button(action: {}) {
-                    HStack {
-                        Image(systemName: isRecording ? "mic.fill" : "mic")
-                            .foregroundColor(isRecording ? .red : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                            .font(.title2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(demoManager.isDemo ? "重置Demo" : "开始Demo")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(isRecording ? "正在录音..." : "按住说话")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                                Text(demoManager.isDemo ? "重新开始Demo流程" : "体验完整功能演示")
+                                    .font(.caption)
+                                    .foregroundColor(demoManager.isDemo ? PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7) : .blue.opacity(0.9))
+                            }
 
-                            Text("松开结束识别")
-                                .font(.caption)
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
                                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                                .font(.caption)
                         }
-
-                        Spacer()
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.blue.opacity(0.2))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                                )
+                        )
                     }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(isRecording ? Color.red.opacity(0.1) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(isRecording ? Color.red.opacity(0.5) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
-                            )
-                    )
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .buttonStyle(PlainButtonStyle())
-                .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
-                    if pressing {
-                        isRecording = true
-                        audioRecorderManager.startRecording()
-                    } else {
-                        isRecording = false
-                        if let url = audioRecorderManager.stopRecording() {
-                            transcriptionAPIService.transcribeAudio(fileURL: url)
+            }
+
+            // MARK: - 语音识别模块
+            VStack(spacing: 16) {
+                Text("语音识别")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+                VStack(spacing: 12) {
+                    Button(action: {}) {
+                        HStack {
+                            Image(systemName: isRecording ? "mic.fill" : "mic")
+                                .foregroundColor(isRecording ? .red : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                                .font(.title2)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(isRecording ? "正在录音..." : "按住说话")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+                                Text("松开结束识别")
+                                    .font(.caption)
+                                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                            }
+
+                            Spacer()
                         }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(isRecording ? Color.red.opacity(0.1) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(isRecording ? Color.red.opacity(0.5) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+                                )
+                        )
                     }
-                }, perform: {})
+                    .buttonStyle(PlainButtonStyle())
+                    .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+                        if pressing {
+                            isRecording = true
+                            audioRecorderManager.startRecording()
+                        } else {
+                            isRecording = false
+                            audioRecorderManager.stopRecording { url in
+                                if let url = url {
+                                    transcriptionAPIService.transcribeAudio(fileURL: url)
+                                }
+                            }
+                        }
+                    }, perform: {})
 
-                if transcriptionAPIService.isTranscribing {
-                    ProgressView("正在识别...")
-                }
+                    if transcriptionAPIService.isTranscribing {
+                        ProgressView("正在识别...")
+                    }
 
-                if let errorMessage = transcriptionAPIService.errorMessage {
-                    Text("错误: \(errorMessage)")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                } else if !transcriptionAPIService.transcribedText.isEmpty {
-                    Text("识别结果: \(transcriptionAPIService.transcribedText)")
-                        .font(.caption)
-                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                    if let errorMessage = transcriptionAPIService.errorMessage {
+                        Text("错误: \(errorMessage)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    } else if !transcriptionAPIService.transcribedText.isEmpty {
+                        Text("识别结果: \(transcriptionAPIService.transcribedText)")
+                            .font(.caption)
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                    }
                 }
             }
         }
     }
-}
+
     // MARK: - 设置卡片
     private var settingsSection: some View {
         NavigationLink(destination: SettingsView()) {
@@ -566,6 +614,89 @@ private var demoAndVoiceSection: some View {
             for: userElement,
             delay: delay
         )
+    }
+
+    // MARK: - 完整对话流程模块
+    private var conversationChainSection: some View {
+        VStack(spacing: 16) {
+            Text("AI 对话")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+            Button(action: {}) {
+                HStack {
+                    ZStack {
+                        Image(systemName: "waveform.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(isLongPressing ? .red.opacity(0.8) : .green.opacity(0.8))
+                            .scaleEffect(isLongPressing ? 1.1 : 1.0)
+                            .animation(.easeInOut(duration: 0.3), value: isLongPressing)
+
+                        if isProcessingConversation {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.2)
+                        }
+                    }
+                    .frame(width: 40, height: 40)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(isProcessingConversation ? "处理中..." : (isLongPressing ? "正在录音..." : "按住对话"))
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+                        Text("松开后自动回复并朗读")
+                            .font(.caption)
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                    }
+                    Spacer()
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(isLongPressing ? Color.red.opacity(0.15) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(isLongPressing ? Color.red.opacity(0.5) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .onLongPressGesture(minimumDuration: 0.2, pressing: { pressing in
+                if isProcessingConversation { return }
+
+                if pressing {
+                    if !audioRecorderManager.isRecording {
+                        print("🎙️ 开始录音...")
+                        withAnimation { isLongPressing = true }
+                        audioRecorderManager.startRecording()
+                    }
+                } else {
+                    if audioRecorderManager.isRecording {
+                        print("🎙️ 停止录音.")
+                        withAnimation { isLongPressing = false }
+                        audioRecorderManager.stopRecording { url in
+                            guard let audioURL = url else {
+                                print("❌ 录音文件URL无效")
+                                return
+                            }
+                            print("▶️ 开始处理音频: \(audioURL)")
+                            processAudio(url: audioURL)
+                        }
+                    }
+                }
+            }, perform: {})
+            .disabled(isProcessingConversation)
+        }
+    }
+
+    // MARK: - 处理音频流程
+    private func processAudio(url: URL) {
+        isProcessingConversation = true
+        transcriptionAPIService.transcribeAudio(fileURL: url)
     }
 }
 
