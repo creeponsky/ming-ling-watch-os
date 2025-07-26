@@ -25,7 +25,6 @@ struct HealthDashboardPageView: View {
             VStack(spacing: 20) {
                 // Demo模块+音频识别模块 - 移到最前面
                 demoAndVoiceSection
-
                 // 问候语和压力状态
                 greetingSection
 
@@ -34,7 +33,6 @@ struct HealthDashboardPageView: View {
 
                 // 通知测试模块
                 notificationTestSection
-
                 // 完整对话流程模块
                 conversationChainSection
 
