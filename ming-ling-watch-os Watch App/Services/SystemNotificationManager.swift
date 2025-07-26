@@ -39,8 +39,10 @@ class SystemNotificationManager: NSObject, ObservableObject {
     
     // MARK: - 发送建议通知
     func sendSuggestionNotification(for element: String, taskType: TaskType, delay: TimeInterval = 1) {
+        print("📱 发送建议通知 - 元素: \(element), 任务类型: \(taskType.rawValue)")
+        
         guard let content = NotificationUtils.getSuggestionContent(for: element, taskType: taskType) else {
-            print("无法获取建议内容")
+            print("❌ 无法获取建议内容 - 元素: \(element), 任务类型: \(taskType.rawValue)")
             return
         }
         
@@ -57,11 +59,13 @@ class SystemNotificationManager: NSObject, ObservableObject {
             "useGIFAnimation": false
         ]
         
+        print("📱 建议通知userInfo: \(notification.userInfo)")
+        
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
@@ -73,17 +77,19 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 发送通知
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("发送建议通知失败: \(error.localizedDescription)")
+                print("❌ 发送建议通知失败: \(error.localizedDescription)")
             } else {
-                print("建议通知已发送")
+                print("✅ 建议通知已发送")
             }
         }
     }
     
     // MARK: - 发送完成通知
     func sendCompletionNotification(for element: String, taskType: TaskType, delay: TimeInterval = 1) {
+        print("📱 发送完成通知 - 元素: \(element), 任务类型: \(taskType.rawValue)")
+        
         guard let content = NotificationUtils.getCompletionContent(for: element, taskType: taskType) else {
-            print("无法获取完成内容")
+            print("❌ 无法获取完成内容 - 元素: \(element), 任务类型: \(taskType.rawValue)")
             return
         }
         
@@ -100,11 +106,13 @@ class SystemNotificationManager: NSObject, ObservableObject {
             "useGIFAnimation": true
         ]
         
+        print("📱 完成通知userInfo: \(notification.userInfo)")
+        
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
@@ -116,9 +124,9 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 发送通知
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("发送完成通知失败: \(error.localizedDescription)")
+                print("❌ 发送完成通知失败: \(error.localizedDescription)")
             } else {
-                print("完成通知已发送")
+                print("✅ 完成通知已发送")
             }
         }
     }
@@ -146,8 +154,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
@@ -189,8 +197,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(
@@ -228,8 +236,8 @@ class SystemNotificationManager: NSObject, ObservableObject {
         // 设置通知类别以启用自定义 Long Look 界面
         notification.categoryIdentifier = "PET_NOTIFICATION"
         
-        // 创建触发器
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        // 创建触发器 - 确保时间间隔大于0
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(0.1, delay), repeats: false)
         
         // 创建请求
         let request = UNNotificationRequest(

@@ -4,8 +4,6 @@ import ImageIO
 
 // MARK: - GIF动画管理器
 class GIFAnimationManager: ObservableObject {
-    static let shared = GIFAnimationManager()
-    
     @Published var isPlaying: Bool = false
     @Published var currentImage: UIImage?
     @Published var currentGIFIndex: Int = 0
@@ -16,36 +14,18 @@ class GIFAnimationManager: ObservableObject {
     private var currentFrameIndex: Int = 0
     private var totalFrames: Int = 0
     
-    private init() {}
+    init() {}
     
     // MARK: - 加载GIF动画
     func loadGIF(named gifName: String) {
-        // 首先尝试从Bundle中加载
+        // 尝试从Bundle中的GIFs文件夹加载
         if let url = Bundle.main.url(forResource: gifName, withExtension: "gif") {
             print("✅ 从Bundle加载GIF文件: \(gifName)")
             loadGIFFromURL(url)
             return
         }
         
-        // 如果Bundle中没有，尝试从项目根目录的assets文件夹加载
-        let projectRoot = FileManager.default.currentDirectoryPath
-        let assetsPath = "\(projectRoot)/assets/\(gifName).gif"
-        let assetsURL = URL(fileURLWithPath: assetsPath)
-        
-        if FileManager.default.fileExists(atPath: assetsPath) {
-            print("✅ 从assets目录加载GIF文件: \(assetsPath)")
-            loadGIFFromURL(assetsURL)
-            return
-        }
-        
-        // 如果都找不到，尝试从应用Bundle的assets目录加载
-        if let bundleURL = Bundle.main.url(forResource: "assets/\(gifName)", withExtension: "gif") {
-            print("✅ 从Bundle的assets目录加载GIF文件: \(gifName)")
-            loadGIFFromURL(bundleURL)
-            return
-        }
-        
-        // 尝试从Bundle中加载不带路径的文件名
+        // 尝试不带扩展名的方式加载
         let fileName = gifName.components(separatedBy: "/").last ?? gifName
         if let bundleURL = Bundle.main.url(forResource: fileName, withExtension: "gif") {
             print("✅ 从Bundle加载文件名: \(fileName)")
@@ -53,12 +33,38 @@ class GIFAnimationManager: ObservableObject {
             return
         }
         
+        // 尝试从Bundle中加载完整路径
+        if let bundleURL = Bundle.main.url(forResource: gifName, withExtension: nil) {
+            print("✅ 从Bundle加载完整路径: \(gifName)")
+            loadGIFFromURL(bundleURL)
+            return
+        }
+        
+        // 尝试查找Bundle中的所有GIF文件进行调试
         print("❌ 无法找到GIF文件: \(gifName)")
         print("尝试过的路径:")
         print("  - Bundle: \(gifName).gif")
-        print("  - Assets: \(assetsPath)")
-        print("  - Bundle Assets: assets/\(gifName).gif")
         print("  - Bundle FileName: \(fileName).gif")
+        print("  - Bundle Full Path: \(gifName)")
+        
+        // 列出Bundle中的GIF文件用于调试
+        if let bundlePath = Bundle.main.resourcePath {
+            let fileManager = FileManager.default
+            do {
+                let contents = try fileManager.contentsOfDirectory(atPath: bundlePath)
+                let gifFiles = contents.filter { $0.hasSuffix(".gif") }
+                print("Bundle中找到的GIF文件: \(gifFiles)")
+                
+                // 检查GIFs文件夹
+                let gifsPath = "\(bundlePath)/GIFs"
+                if fileManager.fileExists(atPath: gifsPath) {
+                    let gifsContents = try fileManager.contentsOfDirectory(atPath: gifsPath)
+                    print("GIFs文件夹内容: \(gifsContents)")
+                }
+            } catch {
+                print("无法列出Bundle内容: \(error)")
+            }
+        }
         
         // 清空当前状态
         gifImages.removeAll()

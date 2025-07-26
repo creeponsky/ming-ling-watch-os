@@ -7,19 +7,23 @@ struct HealthDashboardPageView: View {
     @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var environmentManager = EnvironmentSensorManager.shared
     @StateObject private var systemNotificationManager = SystemNotificationManager.shared
-    @StateObject private var gifAnimationManager = GIFAnimationManager.shared
+    @StateObject private var gifAnimationManager = GIFAnimationManager()
     @StateObject private var audioRecorderManager = AudioRecorderManager.shared
     @StateObject private var transcriptionAPIService = TranscriptionAPIService.shared
     @StateObject private var chatAPIService = ChatAPIService.shared
     @StateObject private var speechAPIService = SpeechAPIService.shared
     @StateObject private var audioPlayerManager = AudioPlayerManager.shared
-
+    @StateObject private var demoManager = DemoManager.shared
+    
     @State private var isDelayedNotification: Bool = false
     @State private var isRecording = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // Demo模块 - 移到最前面
+                demoSection
+                
                 // 问候语和压力状态
                 greetingSection
 
@@ -116,8 +120,7 @@ struct HealthDashboardPageView: View {
                         HealthCardView(
                             reminder: reminder,
                             healthData: getHealthData(for: reminder.type),
-                            userElement: profileManager.userProfile.fiveElements?.primary ?? "金",
-                            isDarkMode: true
+                            userElement: profileManager.userProfile.fiveElements?.primary ?? "金"
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -332,10 +335,90 @@ struct HealthDashboardPageView: View {
                 audioPlayerManager.playAudio(data: data)
             }
         }
-    }
+    }// MARK: - 综合模块：Demo + 语音识别
+private var demoAndVoiceSection: some View {
+    VStack(spacing: 32) {
 
-    // MARK: - 音频识别模块
-    private var audioRecordingSection: some View {
+        // MARK: - Demo模块
+        VStack(spacing: 16) {
+            Text("Demo体验")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+            VStack(spacing: 12) {
+                // Demo状态显示
+                if demoManager.isDemo {
+                    HStack {
+                        Image(systemName: "play.circle.fill")
+                            .foregroundColor(.green)
+
+                        VStack(alignment: .leading) {
+                            Text("Demo进行中")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                        }
+
+                        Spacer()
+
+                        if demoManager.canExitDemo {
+                            Button("退出") {
+                                demoManager.exitDemo()
+                            }
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+
+                // Demo按钮
+                Button(action: {
+                    if demoManager.isDemo {
+                        demoManager.resetDemo()
+                    } else {
+                        demoManager.startDemo()
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: demoManager.isDemo ? "arrow.clockwise" : "play.fill")
+                            .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            .font(.title2)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(demoManager.isDemo ? "重置Demo" : "开始Demo")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+                            Text(demoManager.isDemo ? "重新开始Demo流程" : "体验完整功能演示")
+                                .font(.caption)
+                                .foregroundColor(demoManager.isDemo ? PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7) : .blue.opacity(0.9))
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                            .font(.caption)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.blue.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+
+        // MARK: - 语音识别模块
         VStack(spacing: 16) {
             Text("语音识别")
                 .font(.headline)
@@ -402,7 +485,7 @@ struct HealthDashboardPageView: View {
             }
         }
     }
-
+}
     // MARK: - 设置卡片
     private var settingsSection: some View {
         NavigationLink(destination: SettingsView()) {

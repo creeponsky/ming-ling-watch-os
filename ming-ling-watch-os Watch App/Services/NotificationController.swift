@@ -24,12 +24,26 @@ final class NotificationController: WKUserNotificationHostingController<PetNotif
         let userInfo = notification.request.content.userInfo
         print("=== 通知接收调试 ===")
         print("原始 userInfo: \(userInfo)")
+        print("通知标题: \(notification.request.content.title)")
+        print("通知内容: \(notification.request.content.body)")
         
         if let element = userInfo["element"] as? String {
             self.userElement = element
-            print("设置用户元素: \(element)")
+            print("✅ 设置用户元素: \(element)")
         } else {
             print("⚠️ 未找到元素信息，使用默认值: \(self.userElement)")
+        }
+        
+        if let taskType = userInfo["taskType"] as? String {
+            print("✅ 任务类型: \(taskType)")
+        } else {
+            print("⚠️ 未找到任务类型")
+        }
+        
+        if let type = userInfo["type"] as? String {
+            print("✅ 通知类型: \(type)")
+        } else {
+            print("⚠️ 未找到通知类型")
         }
         
         self.notificationUserInfo = userInfo as? [String: Any] ?? [:]
@@ -67,7 +81,7 @@ struct PetNotificationLongLookView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(getNotificationMessage())
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(PetUtils.getElementTextColor(for: userElement))
+                    .foregroundColor(.white)
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -103,7 +117,7 @@ struct PetNotificationLongLookView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 3)
-                    .position(x: 110, y: 75)
+                    .position(x: 95, y: 75)
                 }
             }
         )
@@ -203,6 +217,7 @@ struct PetNotificationLongLookView: View {
         }
         
         // 默认消息
+        print("⚠️ 通知控制器: 使用默认消息，userElement=\(userElement), notificationUserInfo=\(notificationUserInfo)")
         return "今天也要加油哦！"
     }
     
@@ -221,7 +236,9 @@ struct PetNotificationLongLookView: View {
             let gifName = getGIFName()
             print("GIF动画名称: \(gifName)")
         } else {
-            print("图片名称: \(PetUtils.getPetSpeakImageName(for: userElement))")
+            let petSpeakImageName = PetUtils.getPetSpeakImageName(for: userElement)
+            print("宠物说话图片名称: \(petSpeakImageName)")
+            print("宠物图片名称: \(PetUtils.getPetImageName(for: userElement))")
         }
         print("==================")
     }

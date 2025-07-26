@@ -5,7 +5,7 @@ struct GIFAnimationView: View {
     let gifName: String
     let isPlaying: Bool
     
-    @StateObject private var animationManager = GIFAnimationManager.shared
+    @StateObject private var animationManager = GIFAnimationManager()
     
     init(gifName: String, isPlaying: Bool = true) {
         self.gifName = gifName
