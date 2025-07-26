@@ -462,73 +462,73 @@ struct HealthDashboardPageView: View {
             }
 
             // MARK: - 语音识别模块
-            VStack(spacing: 16) {
-                Text("语音识别")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+            // VStack(spacing: 16) {
+            //     Text("语音识别")
+            //         .font(.headline)
+            //         .fontWeight(.semibold)
+            //         .frame(maxWidth: .infinity, alignment: .leading)
+            //         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
 
-                VStack(spacing: 12) {
-                    Button(action: {}) {
-                        HStack {
-                            Image(systemName: isRecording ? "mic.fill" : "mic")
-                                .foregroundColor(isRecording ? .red : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                                .font(.title2)
+            //     VStack(spacing: 12) {
+            //         Button(action: {}) {
+            //             HStack {
+            //                 Image(systemName: isRecording ? "mic.fill" : "mic")
+            //                     .foregroundColor(isRecording ? .red : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+            //                     .font(.title2)
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(isRecording ? "正在录音..." : "按住说话")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+            //                 VStack(alignment: .leading, spacing: 4) {
+            //                     Text(isRecording ? "正在录音..." : "按住说话")
+            //                         .font(.headline)
+            //                         .fontWeight(.semibold)
+            //                         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
 
-                                Text("松开结束识别")
-                                    .font(.caption)
-                                    .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
-                            }
+            //                     Text("松开结束识别")
+            //                         .font(.caption)
+            //                         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+            //                 }
 
-                            Spacer()
-                        }
-                        .padding()
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(isRecording ? Color.red.opacity(0.1) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(isRecording ? Color.red.opacity(0.5) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
-                                )
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
-                        if pressing {
-                            isRecording = true
-                            audioRecorderManager.startRecording()
-                        } else {
-                            isRecording = false
-                            audioRecorderManager.stopRecording { url in
-                                if let url = url {
-                                    transcriptionAPIService.transcribeAudio(fileURL: url)
-                                }
-                            }
-                        }
-                    }, perform: {})
+            //                 Spacer()
+            //             }
+            //             .padding()
+            //             .background(
+            //                 RoundedRectangle(cornerRadius: 16)
+            //                     .fill(isRecording ? Color.red.opacity(0.1) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
+            //                     .overlay(
+            //                         RoundedRectangle(cornerRadius: 16)
+            //                             .stroke(isRecording ? Color.red.opacity(0.5) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+            //                     )
+            //             )
+            //         }
+            //         .buttonStyle(PlainButtonStyle())
+            //         .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+            //             if pressing {
+            //                 isRecording = true
+            //                 audioRecorderManager.startRecording()
+            //             } else {
+            //                 isRecording = false
+            //                 audioRecorderManager.stopRecording { url in
+            //                     if let url = url {
+            //                         transcriptionAPIService.transcribeAudio(fileURL: url)
+            //                     }
+            //                 }
+            //             }
+            //         }, perform: {})
 
-                    if transcriptionAPIService.isTranscribing {
-                        ProgressView("正在识别...")
-                    }
+            //         if transcriptionAPIService.isTranscribing {
+            //             ProgressView("正在识别...")
+            //         }
 
-                    if let errorMessage = transcriptionAPIService.errorMessage {
-                        Text("错误: \(errorMessage)")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    } else if !transcriptionAPIService.transcribedText.isEmpty {
-                        Text("识别结果: \(transcriptionAPIService.transcribedText)")
-                            .font(.caption)
-                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                    }
-                }
-            }
+            //         if let errorMessage = transcriptionAPIService.errorMessage {
+            //             Text("错误: \(errorMessage)")
+            //                 .font(.caption)
+            //                 .foregroundColor(.red)
+            //         } else if !transcriptionAPIService.transcribedText.isEmpty {
+            //             Text("识别结果: \(transcriptionAPIService.transcribedText)")
+            //                 .font(.caption)
+            //                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+            //         }
+            //     }
+            // }
         }
     }
 

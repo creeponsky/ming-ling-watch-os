@@ -88,7 +88,7 @@ struct PetNotificationLongLookView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .frame(width: 108, height: 70, alignment: .leading)
+            .frame(width: 130, height: 70, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 14)
                     .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.95))
@@ -98,44 +98,46 @@ struct PetNotificationLongLookView: View {
                     )
             )
             .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-            .position(x: 70, y: 40)
+            .position(x: 96, y: 45)
         }
-        .frame(width: 200, height: 200)
+        .frame(width: 250, height: 250)
         // 使用overlay添加其他元素，实现真正的绝对定位
-        .overlay(
-            // 亲密度显示
-            Group {
-                if isCompletionNotification() {
-                    HStack(spacing: 4) {
-                        Image(systemName: getIntimacyIcon())
-                            .font(.caption2)
-                            .foregroundColor(Color(hex: profileManager.userProfile.intimacyGradeColor))
+//        .overlay(
+            // // 亲密度显示
+            // Group {
+            //     if isCompletionNotification() {
+            //         HStack(spacing: 4) {
+            //             Image(systemName: getIntimacyIcon())
+            //                 .font(.caption2)
+            //                 .foregroundColor(Color(hex: profileManager.userProfile.intimacyGradeColor))
                         
-                        Text("+\(getIntimacyPoints())")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundColor(PetUtils.getElementTextColor(for: userElement))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 2)
-                    .position(x: 95, y: 65)
-                }
-            }
-        )
+            //             Text("+\(getIntimacyPoints())")
+            //                 .font(.system(size: 10, weight: .bold, design: .rounded))
+            //                 .foregroundColor(PetUtils.getElementTextColor(for: userElement))
+            //         }
+            //         .padding(.horizontal, 14)
+            //         .padding(.vertical, 2)
+            //         .position(x: 95, y: 65)
+            //     }
+            // }
+//        )
         .overlay(
             // GIF动画层
             Group {
                 if let useGIFAnimation = notificationUserInfo["useGIFAnimation"] as? Bool, useGIFAnimation {
                     GIFAnimationView(gifName: getGIFName(), isPlaying: true)
                         .frame(width: 240, height: 240)
-                        .clipped()
+                        .position(x: 165, y: 165)
+                        .allowsHitTesting(false) // 防止影响其他UI交互
                 } else {
                     Image(PetUtils.getPetSpeakImageName(for: userElement))
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 140, height: 140)
+                        .frame(width: 168, height: 168) // 210 * 0.8 = 168
+                        .position(x: 155, y: 165) // 往右移动30像素
+                        .allowsHitTesting(false) // 防止影响其他UI交互
                 }
             }
-            .position(x: 140, y: 140)
         )
         .onAppear {
             loadNotificationContent()

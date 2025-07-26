@@ -52,7 +52,7 @@ class DemoManager: ObservableObject {
     @Published var isRecording: Bool = false
     @Published var hasShownWelcome: Bool = false
     @Published var shouldPlayEvolutionAnimation: Bool = false
-    @Published var countdownSeconds: Int = 60 // 60秒倒计时
+    @Published var countdownSeconds: Int = 180 // 180秒倒计时
     @Published var isStepMonitoringActive: Bool = false // 步数监测是否激活
     @Published var sedentaryCountdown: Int = 10 // 久坐检测倒计时
     
@@ -93,7 +93,7 @@ class DemoManager: ObservableObject {
         isRecording = false
         hasShownWelcome = false
         shouldPlayEvolutionAnimation = false
-        countdownSeconds = 60
+        countdownSeconds = 180
         isStepMonitoringActive = false
         // sedentaryCountdown 现在由新的倒计时逻辑管理
         
@@ -220,14 +220,28 @@ class DemoManager: ObservableObject {
             let now = Date()
             print("🎬 Demo: 获取初始步数时间: \(now)")
             
-            // 获取今日总步数作为初始值
+            // 获取当前时刻的步数作为初始值
             self?.healthKitManager.getSteps(from: Calendar.current.startOfDay(for: Date()), to: now) { totalSteps in
                 DispatchQueue.main.async {
+                    // 设置一个标记，表示倒计时即将开始，但还在准备阶段
                     self?.initialStepCount = totalSteps
-                    print("🎬 Demo: 设置初始步数: \(totalSteps) (今日总步数)")
+                    self?.demoProfile.stepCount = 0
+                    print("🎬 Demo: 设置初始步数: \(totalSteps) (准备阶段)")
                     
-                    // 启动60秒倒计时
+                    // 启动180秒倒计时
                     self?.startCountdownTimer()
+                    
+                    // 10秒后（准备时间结束）重新获取初始步数，开始正式计算
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+                        self?.healthKitManager.getSteps(from: Calendar.current.startOfDay(for: Date()), to: Date()) { newTotalSteps in
+                            DispatchQueue.main.async {
+                                self?.initialStepCount = newTotalSteps
+                                self?.demoProfile.stepCount = 0
+                                print("🎬 Demo: 准备时间结束，重新设置初始步数: \(newTotalSteps)，开始正式计算")
+                                self?.objectWillChange.send()
+                            }
+                        }
+                    }
                     
                     // 确保UI更新
                     self?.objectWillChange.send()
@@ -313,9 +327,9 @@ class DemoManager: ObservableObject {
     
     // MARK: - 启动倒计时
     private func startCountdownTimer() {
-        // 设置倒计时结束时间（60秒后）
-        countdownEndTime = Date().addingTimeInterval(60)
-        countdownSeconds = 60
+        // 设置倒计时结束时间（180秒后）
+        countdownEndTime = Date().addingTimeInterval(180)
+        countdownSeconds = 180
         
         print("🎬 Demo: 开始步数检测倒计时，结束时间: \(countdownEndTime?.description ?? "nil")")
         

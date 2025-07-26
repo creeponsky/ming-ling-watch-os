@@ -25,7 +25,6 @@ struct DemoHealthDetectionView: View {
             .padding()
         }
         .background(PetUtils.getElementBackgroundColor(for: "木"))
-
         .navigationBarHidden(true)
         .onAppear {
             setupView()

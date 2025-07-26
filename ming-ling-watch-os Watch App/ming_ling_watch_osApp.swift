@@ -50,6 +50,7 @@ struct ming_ling_watch_os_Watch_AppApp: App {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        .navigationBarHidden(true)
         .animation(.easeInOut(duration: 0.8), value: demoManager.demoState)
     }
 }
