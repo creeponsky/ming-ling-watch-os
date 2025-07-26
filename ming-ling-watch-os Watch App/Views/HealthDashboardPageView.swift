@@ -8,24 +8,33 @@ struct HealthDashboardPageView: View {
     @StateObject private var environmentManager = EnvironmentSensorManager.shared
     @StateObject private var systemNotificationManager = SystemNotificationManager.shared
     @StateObject private var gifAnimationManager = GIFAnimationManager.shared
-    
+    @StateObject private var audioRecorderManager = AudioRecorderManager.shared
+    @StateObject private var transcriptionAPIService = TranscriptionAPIService.shared
+    @StateObject private var chatAPIService = ChatAPIService.shared
+    @StateObject private var speechAPIService = SpeechAPIService.shared
+    @StateObject private var audioPlayerManager = AudioPlayerManager.shared
+
     @State private var isDelayedNotification: Bool = false
-    
+    @State private var isRecording = false
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // 问候语和压力状态
                 greetingSection
-                
+
                 // 健康卡片
                 healthCardsSection
-                
+
                 // 通知测试模块
                 notificationTestSection
-                
+
+                // 音频识别模块
+                audioRecordingSection
+
                 // 设置入口
                 settingsSection
-                
+
                 // 添加底部间距确保可以滚动到底部
                 Spacer(minLength: 20)
             }
@@ -38,14 +47,14 @@ struct HealthDashboardPageView: View {
             profileManager.updateHealthStreak()
             // 设置通知代理
             UNUserNotificationCenter.current().delegate = systemNotificationManager
-            
+
             // 延迟刷新数据，确保授权完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 healthKitManager.objectWillChange.send()
             }
         }
     }
-    
+
     // MARK: - 问候语区域
     private var greetingSection: some View {
         VStack(spacing: 12) {
@@ -58,19 +67,19 @@ struct HealthDashboardPageView: View {
                             .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
                             .font(.title3)
                     )
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(profileManager.getGreeting())
                         .font(.headline)
                         .fontWeight(.semibold)
                         .multilineTextAlignment(.leading)
                         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                    
+
                     Text(profileManager.getStressStatusDescription())
                         .font(.caption)
                         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
                 }
-                
+
                 Spacer()
             }
             .padding()
@@ -84,7 +93,7 @@ struct HealthDashboardPageView: View {
             )
         }
     }
-    
+
     // MARK: - 健康卡片区域
     private var healthCardsSection: some View {
         VStack(spacing: 16) {
@@ -93,14 +102,14 @@ struct HealthDashboardPageView: View {
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-            
+
             LazyVGrid(columns: [
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 12) {
                 ForEach(HealthReminder.allReminders, id: \.id) { reminder in
                     NavigationLink(destination: HealthDetailView(
-                        reminder: reminder, 
+                        reminder: reminder,
                         userElement: profileManager.userProfile.fiveElements?.primary ?? "金",
                         healthData: getHealthData(for: reminder.type)
                     )) {
@@ -119,7 +128,7 @@ struct HealthDashboardPageView: View {
             }
         }
     }
-    
+
     // MARK: - 通知测试模块
     private var notificationTestSection: some View {
         VStack(spacing: 16) {
@@ -128,7 +137,7 @@ struct HealthDashboardPageView: View {
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-            
+
             VStack(spacing: 12) {
                 // 延迟发送开关
                 HStack {
@@ -136,11 +145,11 @@ struct HealthDashboardPageView: View {
                         .toggleStyle(SwitchToggleStyle(tint: PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金")))
                         .font(.caption)
                         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal, 4)
-                
+
                 // 发送建议通知按钮
                 Button(action: {
                     sendSuggestionTest()
@@ -149,20 +158,20 @@ struct HealthDashboardPageView: View {
                         Image(systemName: "lightbulb.fill")
                             .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
                             .font(.title2)
-                        
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text("发送建议通知")
                                 .font(.headline)
                                 .fontWeight(.semibold)
                                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                            
+
                             Text("随机选择一个建议进行推送")
                                 .font(.caption)
                                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
                         }
-                        
+
                         Spacer()
-                        
+
                         Image(systemName: "chevron.right")
                             .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
                             .font(.caption)
@@ -178,7 +187,7 @@ struct HealthDashboardPageView: View {
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
-                
+
                 // 发送完成通知按钮
                 Button(action: {
                     sendCompletionTest()
@@ -187,20 +196,20 @@ struct HealthDashboardPageView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
                             .font(.title2)
-                        
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text("发送完成通知")
                                 .font(.headline)
                                 .fontWeight(.semibold)
                                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                            
+
                             Text("发送完成通知并增加亲密度")
                                 .font(.caption)
                                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
                         }
-                        
+
                         Spacer()
-                        
+
                         Image(systemName: "chevron.right")
                             .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
                             .font(.caption)
@@ -216,10 +225,184 @@ struct HealthDashboardPageView: View {
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
+
+                // 发送聊天请求按钮
+                Button(action: {
+                    chatAPIService.sendMessage(content: "hi")
+                }) {
+                    HStack {
+                        Image(systemName: "paperplane.fill")
+                            .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            .font(.title2)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("发送聊天请求")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+                            Text("向AI助手发送一条消息")
+                                .font(.caption)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                            .font(.caption)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                if chatAPIService.isRequesting {
+                    ProgressView("正在发送...")
+                }
+
+                if let errorMessage = chatAPIService.errorMessage {
+                    Text("错误: \(errorMessage)")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                } else if !chatAPIService.responseContent.isEmpty {
+                    Text("AI回复: \(chatAPIService.responseContent)")
+                        .font(.caption)
+                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                }
+
+                // 发送语音请求按钮
+                Button(action: {
+                    speechAPIService.generateSpeech(text: "早睡养肝血，准备休息吧。")
+                }) {
+                    HStack {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            .font(.title2)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("播放养生提醒")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+                            Text("点击收听一条健康建议")
+                                .font(.caption)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                            .font(.caption)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                if speechAPIService.isRequesting || audioPlayerManager.isPlaying {
+                    ProgressView(audioPlayerManager.isPlaying ? "正在播放..." : "正在请求...")
+                }
+
+                if let errorMessage = speechAPIService.errorMessage {
+                    Text("错误: \(errorMessage)")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .onChange(of: speechAPIService.audioData) { newData in
+            if let data = newData {
+                audioPlayerManager.playAudio(data: data)
             }
         }
     }
-    
+
+    // MARK: - 音频识别模块
+    private var audioRecordingSection: some View {
+        VStack(spacing: 16) {
+            Text("语音识别")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+            VStack(spacing: 12) {
+                Button(action: {}) {
+                    HStack {
+                        Image(systemName: isRecording ? "mic.fill" : "mic")
+                            .foregroundColor(isRecording ? .red : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                            .font(.title2)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(isRecording ? "正在录音..." : "按住说话")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+
+                            Text("松开结束识别")
+                                .font(.caption)
+                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
+                        }
+
+                        Spacer()
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(isRecording ? Color.red.opacity(0.1) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(isRecording ? Color.red.opacity(0.5) : PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+                    if pressing {
+                        isRecording = true
+                        audioRecorderManager.startRecording()
+                    } else {
+                        isRecording = false
+                        if let url = audioRecorderManager.stopRecording() {
+                            transcriptionAPIService.transcribeAudio(fileURL: url)
+                        }
+                    }
+                }, perform: {})
+
+                if transcriptionAPIService.isTranscribing {
+                    ProgressView("正在识别...")
+                }
+
+                if let errorMessage = transcriptionAPIService.errorMessage {
+                    Text("错误: \(errorMessage)")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                } else if !transcriptionAPIService.transcribedText.isEmpty {
+                    Text("识别结果: \(transcriptionAPIService.transcribedText)")
+                        .font(.caption)
+                        .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
+                }
+            }
+        }
+    }
+
     // MARK: - 设置卡片
     private var settingsSection: some View {
         NavigationLink(destination: SettingsView()) {
@@ -227,20 +410,20 @@ struct HealthDashboardPageView: View {
                 Image(systemName: "gearshape.fill")
                     .foregroundColor(PetUtils.getElementDialogColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
                     .font(.title2)
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("设置与数据")
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                    
+
                     Text("查看所有数据并更改设置")
                         .font(.caption)
                         .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
                     .font(.caption)
@@ -257,7 +440,7 @@ struct HealthDashboardPageView: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
+
     // MARK: - 获取健康数据
     private func getHealthData(for type: HealthReminder.ReminderType) -> String {
         switch type {
@@ -275,27 +458,27 @@ struct HealthDashboardPageView: View {
             return healthKitManager.sleepAnalysis
         }
     }
-    
+
     // MARK: - 发送建议通知
     private func sendSuggestionTest() {
         let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
         let delay = isDelayedNotification ? 10.0 : 1.0
-        
+
         print("发送建议通知 - 用户元素: \(userElement), 延迟: \(delay)秒")
-        
+
         systemNotificationManager.sendRandomSuggestionNotification(
             for: userElement,
             delay: delay
         )
     }
-    
+
     // MARK: - 发送完成通知
     private func sendCompletionTest() {
         let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
         let delay = isDelayedNotification ? 10.0 : 1.0
-        
+
         print("发送完成通知 - 用户元素: \(userElement), 延迟: \(delay)秒")
-        
+
         systemNotificationManager.sendRandomCompletionNotification(
             for: userElement,
             delay: delay
@@ -308,4 +491,4 @@ struct HealthDashboardPageView_Previews: PreviewProvider {
     static var previews: some View {
         HealthDashboardPageView()
     }
-} 
+}
