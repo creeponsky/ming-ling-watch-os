@@ -78,29 +78,29 @@ struct PetNotificationLongLookView: View {
                 .ignoresSafeArea()
             
             // 对话框
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(getNotificationMessage())
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(width: 112, height: 80, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(width: 108, height: 70, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 14)
                     .fill(PetUtils.getElementDialogColor(for: userElement).opacity(0.95))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: 14)
                             .stroke(PetUtils.getElementDialogColor(for: userElement), lineWidth: 1.5)
                     )
             )
-            .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
-            .position(x: 70, y: 50)
+            .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+            .position(x: 70, y: 40)
         }
-        .frame(width: 200, height: 240)
+        .frame(width: 200, height: 200)
         // 使用overlay添加其他元素，实现真正的绝对定位
         .overlay(
             // 亲密度显示
@@ -115,9 +115,9 @@ struct PetNotificationLongLookView: View {
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundColor(PetUtils.getElementTextColor(for: userElement))
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 3)
-                    .position(x: 95, y: 75)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 2)
+                    .position(x: 95, y: 65)
                 }
             }
         )
@@ -132,10 +132,10 @@ struct PetNotificationLongLookView: View {
                     Image(PetUtils.getPetSpeakImageName(for: userElement))
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 160, height: 160)
+                        .frame(width: 140, height: 140)
                 }
             }
-            .position(x: 140, y: 160)
+            .position(x: 140, y: 140)
         )
         .onAppear {
             loadNotificationContent()

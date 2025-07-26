@@ -266,17 +266,39 @@ class HealthMonitoringService: ObservableObject {
     private func evaluateSedentaryFollowUp(_ stepsAfterReminder: Int) {
         let stepsIncrease = stepsAfterReminder - stepsBeforeReminder
         
-        if stepsIncrease >= 100 {
-            // 成功活动，发送完成通知
-            let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
-            systemNotificationManager.sendCompletionNotification(
-                for: userElement,
-                taskType: .sedentary
-            )
+        print("久坐后续检测：提醒前步数 \(stepsBeforeReminder)，提醒后步数 \(stepsAfterReminder)，增量 \(stepsIncrease)")
+        
+        // 处理负数增量的情况（可能是数据异常）
+        if stepsIncrease < 0 {
+            print("久坐后续检测：检测到负数增量 \(stepsIncrease)，可能是数据异常，使用绝对值计算")
+            let absoluteIncrease = abs(stepsIncrease)
             
-            print("久坐后续检测成功：步数增加 \(stepsIncrease) 步")
+            if absoluteIncrease >= 100 {
+                // 成功活动，发送完成通知
+                let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
+                systemNotificationManager.sendCompletionNotification(
+                    for: userElement,
+                    taskType: .sedentary
+                )
+                
+                print("久坐后续检测成功：步数变化 \(absoluteIncrease) 步（绝对值）")
+            } else {
+                print("久坐后续检测：步数变化不足，仅变化 \(absoluteIncrease) 步（绝对值）")
+            }
         } else {
-            print("久坐后续检测：步数增加不足，仅增加 \(stepsIncrease) 步")
+            // 正常情况
+            if stepsIncrease >= 100 {
+                // 成功活动，发送完成通知
+                let userElement = profileManager.userProfile.fiveElements?.primary ?? "金"
+                systemNotificationManager.sendCompletionNotification(
+                    for: userElement,
+                    taskType: .sedentary
+                )
+                
+                print("久坐后续检测成功：步数增加 \(stepsIncrease) 步")
+            } else {
+                print("久坐后续检测：步数增加不足，仅增加 \(stepsIncrease) 步")
+            }
         }
         
         // 重置监测状态

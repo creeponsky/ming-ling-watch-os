@@ -444,30 +444,30 @@ struct DemoMainPetView: View {
         showEvolutionAnimation = true
         evolutionPhase = .initial
         
-        // 0.5秒后开始淡出2级图片
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        // 立即开始淡出2级图片
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             evolutionPhase = .fadeOut
             print("🎬 2级图片开始淡出")
             
-            // 0.5秒后GIF淡入并立即播放
+            // 0.5秒后GIF淡入
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 evolutionPhase = .gifFadeIn
                 print("🎬 GIF开始淡入")
                 
-                // 立即开始播放GIF
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // 暂停2秒后再开始播放
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     evolutionPhase = .playing
                     print("🎬 开始播放进化GIF")
                     
-                    // 假设GIF播放时间为3秒，然后淡出
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    // 假设GIF播放时间为3秒，然后暂停3秒
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                         evolutionPhase = .gifFadeOut
-                        print("🎬 GIF开始淡出")
+                        print("🎬 GIF播放完成，开始淡出")
                         
-                        // 0.5秒后显示3级UI
+                        // 0.5秒后显示3级UI和其他图标
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             evolutionPhase = .finalFadeIn
-                            print("🎬 3级UI开始淡入")
+                            print("🎬 3级UI和其他图标开始淡入")
                             
                             // 0.5秒后结束动画
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

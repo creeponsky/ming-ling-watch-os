@@ -11,7 +11,6 @@ enum DemoState: String, CaseIterable, Codable {
     case stepDetection = "step_detection"         // 步数检测阶段
     case intimacyUpgrade = "intimacy_upgrade"     // 亲密度升级阶段
     case voiceInteraction = "voice_interaction"   // 语音交互阶段
-    case voiceCompleted = "voice_completed"       // 语音完成阶段
     case completed = "completed"                  // demo完成
 }
 
@@ -58,7 +57,6 @@ class DemoManager: ObservableObject {
     @Published var sedentaryCountdown: Int = 10 // 久坐检测倒计时
     
     private var stepCheckCount: Int = 0 // 步数检查次数
-    private var isInitialStepSet: Bool = false // 是否已设置真正的初始步数
     
     private let demoKey = "demoData"
     private let userDefaults = UserDefaults.standard
@@ -210,14 +208,18 @@ class DemoManager: ObservableObject {
         // 重置步数为0，因为我们只关心增量
         demoProfile.stepCount = 0
         stepCheckCount = 0
-        isInitialStepSet = false
         
         // 记录开始监测的时间
         let startTime = Date()
         print("🎬 Demo: 开始监测时间: \(startTime)")
         
-        // 延迟3秒后获取初始步数，确保HealthKit数据稳定
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+        // 先启动步数监测，让MotionManager开始工作
+        motionManager.startStepCounting { [weak self] currentTotalSteps in
+            self?.handleStepCountUpdate(currentTotalSteps)
+        }
+        
+        // 延迟2秒后获取初始步数，确保MotionManager已经开始工作
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             let now = Date()
             print("🎬 Demo: 获取初始步数时间: \(now)")
             
@@ -226,11 +228,6 @@ class DemoManager: ObservableObject {
                 DispatchQueue.main.async {
                     self?.initialStepCount = totalSteps
                     print("🎬 Demo: 设置初始步数: \(totalSteps) (今日总步数)")
-                    
-                    // 启动步数监测（只使用MotionManager，不使用定时器）
-                    self?.motionManager.startStepCounting { currentTotalSteps in
-                        self?.handleStepCountUpdate(currentTotalSteps)
-                    }
                     
                     // 启动60秒倒计时
                     self?.startCountdownTimer()
@@ -248,35 +245,53 @@ class DemoManager: ObservableObject {
         
         stepCheckCount += 1
         
+        // 如果初始步数还没有设置，先设置初始步数
+        if initialStepCount == 0 {
+            initialStepCount = currentTotalSteps
+            demoProfile.stepCount = 0
+            print("🎬 Demo: 首次设置初始步数: \(initialStepCount)")
+            return
+        }
+        
         // 计算从开始监测后的步数增量
         let stepIncrease = currentTotalSteps - initialStepCount
         
         print("🎬 Demo: 步数处理 - 当前总步数: \(currentTotalSteps), 初始步数: \(initialStepCount), 计算增量: \(stepIncrease), 检查次数: \(stepCheckCount)")
         
-        // 验证步数增量的合理性（防止异常数据）
+        // 处理负数增量的情况（初始步数可能不准确）
         if stepIncrease < 0 {
-            print("🎬 Demo: 步数异常，增量为负数: \(stepIncrease)，忽略此次更新")
-            return
+            print("🎬 Demo: 检测到负数增量: \(stepIncrease)，重新校准初始步数")
+            
+            // 如果这是前几次检查，重新设置初始步数
+            if stepCheckCount <= 5 {
+                initialStepCount = currentTotalSteps
+                demoProfile.stepCount = 0
+                print("🎬 Demo: 重新校准初始步数: \(initialStepCount)，从0开始计算")
+                return
+            } else {
+                // 如果已经检查多次还是负数，可能是数据异常，忽略此次更新
+                print("🎬 Demo: 多次检查均为负数，忽略此次更新")
+                return
+            }
         }
         
-        // 如果增量过大且是前几次检查，重新设置初始步数
-        if stepIncrease > 50 && stepCheckCount <= 5 && !isInitialStepSet {
-            print("🎬 Demo: 前\(stepCheckCount)次检查增量过大(\(stepIncrease))，重新设置初始步数为当前步数")
+        // 第一次检查时，如果增量过大（超过30步），重新设置初始步数
+        if stepCheckCount == 1 && stepIncrease > 30 {
+            print("🎬 Demo: 第一次检查增量过大(\(stepIncrease))，重新设置初始步数为当前步数")
             initialStepCount = currentTotalSteps
-            isInitialStepSet = true
             demoProfile.stepCount = 0
-            print("🎬 Demo: 重新设置初始步数: \(initialStepCount)")
+            print("🎬 Demo: 重新设置初始步数: \(initialStepCount)，从0开始计算")
             return
         }
         
-        // 如果增量过大且已经设置过初始步数，忽略
-        if stepIncrease > 50 {
+        // 如果增量异常过大（超过200步），可能是数据异常，忽略
+        if stepIncrease > 200 {
             print("🎬 Demo: 步数增量异常过大: \(stepIncrease)，忽略此次更新")
             return
         }
         
-        // 只有当步数有变化时才更新UI，并且确保不会出现负数
-        let newStepCount = max(0, stepIncrease)
+        // 更新步数增量
+        let newStepCount = stepIncrease
         if newStepCount != demoProfile.stepCount {
             demoProfile.stepCount = newStepCount
             print("🎬 Demo: 步数更新成功 - 新增量: \(newStepCount)")
@@ -356,11 +371,11 @@ class DemoManager: ObservableObject {
         // 播放模拟回复音频
         playMockResponse()
         
-        // 进入语音完成阶段，而不是直接完成demo
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            self.demoState = .voiceCompleted
+        // 2秒后完成语音交互并返回主页面
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            self.demoState = .mainPage
             self.saveDemoData()
-            print("🎬 Demo: 进入语音完成阶段")
+            print("🎬 Demo: 语音交互完成，返回主页面")
         }
     }
     
@@ -485,6 +500,6 @@ extension DemoManager {
     
     // 检查是否可以退出demo
     var canExitDemo: Bool {
-        return demoState == .completed || demoState == .voiceInteraction || demoState == .voiceCompleted
+        return demoState == .completed || demoState == .voiceInteraction
     }
 }
