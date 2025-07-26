@@ -5,6 +5,7 @@ class AudioPlayerManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
     static let shared = AudioPlayerManager()
 
     private var audioPlayer: AVAudioPlayer?
+    private var completionHandler: (() -> Void)?
 
     @Published var isPlaying = false
 
@@ -12,7 +13,8 @@ class AudioPlayerManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         super.init()
     }
 
-    func playAudio(data: Data) {
+    func playAudio(data: Data, completion: @escaping () -> Void) {
+        self.completionHandler = completion
         do {
             // Configure the audio session
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
@@ -27,6 +29,7 @@ class AudioPlayerManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         } catch {
             print("Failed to play audio: \(error.localizedDescription)")
             isPlaying = false
+            completion()
         }
     }
 
@@ -43,5 +46,7 @@ class AudioPlayerManager: NSObject, ObservableObject, AVAudioPlayerDelegate {
         } catch {
             print("Failed to deactivate audio session: \(error.localizedDescription)")
         }
+        completionHandler?()
+        completionHandler = nil
     }
 }

@@ -61,36 +61,36 @@ class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDelegate 
                     print("Started recording.")
                 } catch {
                     print("Failed to start recording: \(error.localizedDescription)")
-                    self.stopRecording()
+                    self.stopRecording { _ in }
                 }
             }
         }
     }
 
-    func stopRecording() -> URL? {
+    func stopRecording(completion: @escaping (URL?) -> Void) {
         DispatchQueue.main.async {
             self.audioRecorder?.stop()
             self.isRecording = false
             print("Stopped recording.")
-        }
 
-        do {
-            try audioSession.setActive(false)
-        } catch {
-            print("Failed to deactivate audio session: \(error.localizedDescription)")
-        }
+            do {
+                try self.audioSession.setActive(false)
+            } catch {
+                print("Failed to deactivate audio session: \(error.localizedDescription)")
+            }
 
-        let urlToReturn = recordingURL
-        recordingURL = nil
-        audioRecorder = nil
-        return urlToReturn
+            let urlToReturn = self.recordingURL
+            self.recordingURL = nil
+            self.audioRecorder = nil
+            completion(urlToReturn)
+        }
     }
 
     // MARK: - AVAudioRecorderDelegate
 
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         if !flag {
-            stopRecording()
+            stopRecording { _ in }
             print("Recording finished unsuccessfully.")
         }
     }
