@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 // MARK: - 进化阶段枚举
 enum EvolutionPhase {
@@ -10,9 +11,24 @@ enum EvolutionPhase {
     case finalFadeIn  // 3级UI淡入
 }
 
+// MARK: - 录音状态枚举
+enum RecordingState {
+    case idle         // 空闲状态
+    case recording    // 录音中
+    case processing   // 处理中（转录、AI回复、语音合成）
+    case playing      // 播放中
+    case error        // 错误状态
+}
+
 // MARK: - Demo主宠物视图
 struct DemoMainPetView: View {
     @StateObject private var demoManager = DemoManager.shared
+    @StateObject private var audioRecorderManager = AudioRecorderManager.shared
+    @StateObject private var transcriptionAPIService = TranscriptionAPIService.shared
+    @StateObject private var chatAPIService = ChatAPIService.shared
+    @StateObject private var speechAPIService = SpeechAPIService.shared
+    @StateObject private var audioPlayerManager = AudioPlayerManager.shared
+    
     @State private var showUpgradeAnimation = false
     @State private var isPlayingUpgradeGIF = false
     @State private var showInteractionAnimation = false
@@ -23,6 +39,8 @@ struct DemoMainPetView: View {
     @State private var swipeOffset: CGFloat = 0
     @State private var isSwipeActive = false
     @State private var isWelcomeActive = false // 新增：跟踪欢迎对话框状态
+    @State private var recordingState: RecordingState = .idle // 新增：录音状态
+    @State private var isLongPressing = false // 新增：长按状态
 
     var body: some View {
         GeometryReader { geometry in
@@ -140,9 +158,69 @@ struct DemoMainPetView: View {
             .onChange(of: showHealthDetection) { newValue in
                 print("🔗 showHealthDetection 变化: \(newValue)")
             }
-            // .navigationDestination(isPresented: $showVoiceCompleted) {
-                // DemoVoiceCompletedView()
-            // }
+
+            // 监听AI对话流程的状态变化
+            .onChange(of: transcriptionAPIService.transcribedText) { newText in
+                if !newText.isEmpty && recordingState == .processing {
+                    print("📝 转录完成: \(newText)")
+                    chatAPIService.sendMessage(content: newText)
+                }
+            }
+            .onChange(of: chatAPIService.responseContent) { newContent in
+                if !newContent.isEmpty && recordingState == .processing {
+                    print("🤖 AI回复: \(newContent)")
+                    speechAPIService.generateSpeech(text: newContent)
+                }
+            }
+            .onChange(of: speechAPIService.audioData) { newData in
+                if let data = newData, recordingState == .processing {
+                    recordingState = .playing
+                    audioPlayerManager.playAudio(data: data) {
+                        DispatchQueue.main.async {
+                            self.recordingState = .idle
+                            // 添加完成触觉反馈
+                            WKInterfaceDevice.current().play(.success)
+                            print("✅ AI对话流程结束")
+                        }
+                    }
+                }
+            }
+            .onChange(of: transcriptionAPIService.errorMessage) { error in
+                if let error = error, recordingState == .processing {
+                    print("❌ 转录失败: \(error)")
+                    recordingState = .error
+                    // 添加错误触觉反馈
+                    WKInterfaceDevice.current().play(.failure)
+                    // 3秒后自动恢复到空闲状态
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        recordingState = .idle
+                    }
+                }
+            }
+            .onChange(of: chatAPIService.errorMessage) { error in
+                if let error = error, recordingState == .processing {
+                    print("❌ 获取AI回复失败: \(error)")
+                    recordingState = .error
+                    // 添加错误触觉反馈
+                    WKInterfaceDevice.current().play(.failure)
+                    // 3秒后自动恢复到空闲状态
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        recordingState = .idle
+                    }
+                }
+            }
+            .onChange(of: speechAPIService.errorMessage) { error in
+                if let error = error, recordingState == .processing {
+                    print("❌ 语音合成失败: \(error)")
+                    recordingState = .error
+                    // 添加错误触觉反馈
+                    WKInterfaceDevice.current().play(.failure)
+                    // 3秒后自动恢复到空闲状态
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        recordingState = .idle
+                    }
+                }
+            }
         .navigationBarHidden(true)
         .navigationBarBackButtonHidden(true)
     }
@@ -303,23 +381,17 @@ struct DemoMainPetView: View {
     // MARK: - 底部控制区域
     private var bottomControlArea: some View {
         HStack {
-            Spacer()
-
-            // 语音录音按钮
+            // 语音录音按钮 - 左下角
             if demoManager.demoState == .voiceInteraction && !showEvolutionAnimation {
                 voiceRecordingButton
                     .opacity(1.0)
                     .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
+                    .allowsHitTesting(true)
             }
 
-            // 语音完成阶段的按钮
-            // if demoManager.demoState == .voiceCompleted && !showEvolutionAnimation {
-            //     voiceCompletedButtons
-            //         .opacity(1.0)
-            //         .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
-            // }
+            Spacer()
 
-            // 退出按钮
+            // 退出按钮 - 右下角
             if demoManager.canExitDemo && !showEvolutionAnimation {
                 Button(action: {
                     demoManager.exitDemo()
@@ -348,21 +420,210 @@ struct DemoMainPetView: View {
 
     // MARK: - 语音录音按钮
     private var voiceRecordingButton: some View {
-        Button(action: {
-            if demoManager.isRecording {
-                demoManager.stopRecording()
-            } else {
-                demoManager.startRecording()
+        Button(action: {}) {
+            ZStack {
+                // 背景圆圈 - 根据状态改变颜色
+                Circle()
+                    .fill(recordingState == .idle ? Color.green.opacity(0.3) : 
+                          recordingState == .recording ? Color.red.opacity(0.4) :
+                          recordingState == .processing ? Color.orange.opacity(0.4) :
+                          recordingState == .playing ? Color.blue.opacity(0.4) :
+                          Color.red.opacity(0.4))
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(isLongPressing ? 1.1 : 1.0)
+                    .animation(.easeInOut(duration: 0.3), value: isLongPressing)
+                
+                // 外圈边框
+                Circle()
+                    .stroke(Color.white.opacity(0.5), lineWidth: 2)
+                    .frame(width: 80, height: 80)
+                
+                // 录音时脉冲动画
+                if recordingState == .recording {
+                    Circle()
+                        .stroke(Color.red, lineWidth: 2)
+                        .frame(width: 90, height: 90)
+                        .scaleEffect(isLongPressing ? 1.3 : 1.0)
+                        .opacity(isLongPressing ? 0.0 : 0.8)
+                        .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: false), value: isLongPressing)
+                }
+                
+                // 主图标
+                Group {
+                    switch recordingState {
+                    case .idle:
+                        ZStack {
+                            Image(systemName: "mic.circle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.white)
+                                .scaleEffect(isLongPressing ? 1.1 : 1.0)
+                                .animation(.easeInOut(duration: 0.3), value: isLongPressing)
+                            
+                            // 空闲状态呼吸动画
+                            Circle()
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                .frame(width: 70, height: 70)
+                                .scaleEffect(1.0)
+                                .opacity(0.6)
+                                .animation(
+                                    .easeInOut(duration: 2.0)
+                                    .repeatForever(autoreverses: true),
+                                    value: recordingState
+                                )
+                        }
+                    case .recording:
+                        ZStack {
+                            Image(systemName: "waveform.circle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.white)
+                                .scaleEffect(isLongPressing ? 1.1 : 1.0)
+                                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: isLongPressing)
+                            
+                            // 录音波形动画
+                            HStack(spacing: 2) {
+                                ForEach(0..<4, id: \.self) { index in
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(Color.white)
+                                        .frame(width: 3, height: 8 + CGFloat(index * 2))
+                                        .scaleEffect(y: isLongPressing ? 1.5 : 0.8)
+                                        .animation(
+                                            .easeInOut(duration: 0.4)
+                                            .repeatForever(autoreverses: true)
+                                            .delay(Double(index) * 0.1),
+                                            value: isLongPressing
+                                        )
+                                }
+                            }
+                            .offset(y: 25)
+                        }
+                    case .processing:
+                        ZStack {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                            
+                            // 处理状态旋转动画
+                            Circle()
+                                .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                                .frame(width: 70, height: 70)
+                                .rotationEffect(.degrees(recordingState == .processing ? 360 : 0))
+                                .animation(
+                                    .linear(duration: 1.0)
+                                    .repeatForever(autoreverses: false),
+                                    value: recordingState
+                                )
+                        }
+                    case .playing:
+                        ZStack {
+                            Image(systemName: "speaker.wave.2.circle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.white)
+                                .scaleEffect(1.1)
+                                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: recordingState)
+                            
+                            // 播放声波动画
+                            ForEach(0..<3, id: \.self) { index in
+                                Circle()
+                                    .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                                    .frame(width: 50 + CGFloat(index * 8), height: 50 + CGFloat(index * 8))
+                                    .scaleEffect(1.0)
+                                    .opacity(0.8)
+                                    .animation(
+                                        .easeInOut(duration: 1.0)
+                                        .repeatForever(autoreverses: false)
+                                        .delay(Double(index) * 0.2),
+                                        value: recordingState
+                                    )
+                            }
+                        }
+                    case .error:
+                        ZStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(.white)
+                                .scaleEffect(1.0)
+                                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: recordingState)
+                            
+                            // 错误状态闪烁动画
+                            Circle()
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                .frame(width: 70, height: 70)
+                                .scaleEffect(1.0)
+                                .opacity(0.6)
+                                .animation(
+                                    .easeInOut(duration: 0.5)
+                                    .repeatForever(autoreverses: true),
+                                    value: recordingState
+                                )
+                        }
+                    }
+                }
             }
-        }) {
-            Image(systemName: demoManager.isRecording ? "stop.circle.fill" : "mic.circle.fill")
-                .font(.title)
-                .foregroundColor(demoManager.isRecording ? .red : .green)
-                .scaleEffect(demoManager.isRecording ? 1.2 : 1.0)
-                .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: demoManager.isRecording)
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(!demoManager.canExitDemo)
+        .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+        .disabled(!demoManager.canExitDemo || recordingState == .processing || recordingState == .error)
+        .onLongPressGesture(minimumDuration: 0.2, pressing: { pressing in
+            if recordingState == .processing || recordingState == .error { return }
+            
+            if pressing {
+                if recordingState == .idle {
+                    print("🎙️ 长按开始录音...")
+                    WKInterfaceDevice.current().play(.start)
+                    startVoiceRecording()
+                }
+            } else {
+                if recordingState == .recording {
+                    print("🎙️ 长按停止录音.")
+                    WKInterfaceDevice.current().play(.stop)
+                    stopVoiceRecording()
+                }
+            }
+        }, perform: {})
+    }
+    
+
+    
+    // MARK: - 开始语音录音
+    private func startVoiceRecording() {
+        withAnimation { 
+            isLongPressing = true
+            recordingState = .recording
+        }
+        audioRecorderManager.startRecording()
+        
+        // 2秒后自动停止录音
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            if recordingState == .recording {
+                print("⏰ 自动停止录音")
+                stopVoiceRecording()
+            }
+        }
+    }
+    
+    // MARK: - 停止语音录音
+    private func stopVoiceRecording() {
+        withAnimation { 
+            isLongPressing = false
+            recordingState = .processing
+        }
+        audioRecorderManager.stopRecording { url in
+            guard let audioURL = url else {
+                print("❌ 录音文件URL无效")
+                DispatchQueue.main.async {
+                    self.recordingState = .error
+                    // 添加错误触觉反馈
+                    WKInterfaceDevice.current().play(.failure)
+                    // 3秒后自动恢复到空闲状态
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        self.recordingState = .idle
+                    }
+                }
+                return
+            }
+            print("▶️ 开始处理音频: \(audioURL)")
+            self.transcriptionAPIService.transcribeAudio(fileURL: audioURL)
+        }
     }
 
     // MARK: - 语音完成阶段按钮
