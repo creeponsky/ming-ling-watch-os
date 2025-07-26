@@ -33,7 +33,7 @@ class TranscriptionAPIService: ObservableObject {
             let audioData = try Data(contentsOf: fileURL)
             data.append("--\(boundary)\r\n".data(using: .utf8)!)
             data.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n".data(using: .utf8)!)
-            data.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+            data.append("Content-Type: audio/m4a\r\n\r\n".data(using: .utf8)!)
             data.append(audioData)
             data.append("\r\n".data(using: .utf8)!)
         } catch {
