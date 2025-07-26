@@ -63,7 +63,7 @@ class ChatAPIService: ObservableObject {
         """
 
         let requestBody: [String: Any] = [
-            "model": "MiniMax-M1",
+            "model": "qwen-turbo",
             "messages": [
                 ["role": "user", "content": prompt]
             ],
