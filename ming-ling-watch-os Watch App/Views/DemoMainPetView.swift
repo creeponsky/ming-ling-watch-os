@@ -13,7 +13,6 @@ enum EvolutionPhase {
 // MARK: - Demo主宠物视图
 struct DemoMainPetView: View {
     @StateObject private var demoManager = DemoManager.shared
-    @StateObject private var gifAnimationManager = GIFAnimationManager.shared
     @State private var showUpgradeAnimation = false
     @State private var isPlayingUpgradeGIF = false
     @State private var showInteractionAnimation = false
@@ -23,20 +22,14 @@ struct DemoMainPetView: View {
     @State private var evolutionPhase: EvolutionPhase = .initial
     @State private var swipeOffset: CGFloat = 0
     @State private var isSwipeActive = false
+    @State private var isWelcomeActive = false // 新增：跟踪欢迎对话框状态
     
     var body: some View {
         GeometryReader { geometry in
                 ZStack {
-                    // 背景渐变 - 木属性主题
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.green.opacity(0.3),
-                            Color.black
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
+                    // 背景纯色 - 木属性主题
+                    PetUtils.getElementBackgroundColor(for: "木")
+                        .ignoresSafeArea()
                     
                     // 主内容区域
                     VStack {
@@ -76,9 +69,9 @@ struct DemoMainPetView: View {
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in
-                        // 只处理左滑手势，且亲密度小于3级，且在允许的状态下
+                        // 只处理左滑手势，且亲密度小于3级，且在允许的状态下，且欢迎对话框未激活
                         if value.translation.width < 0 && demoManager.demoProfile.intimacyGrade < 3 && 
-                           (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) {
+                           (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) && !isWelcomeActive {
                             isSwipeActive = true
                             swipeOffset = value.translation.width
                             print("🔄 左滑手势: translation.width = \(value.translation.width)")
@@ -91,7 +84,7 @@ struct DemoMainPetView: View {
                             print("✅ 手势距离满足条件")
                             
                             // 如果在欢迎状态，先关闭欢迎对话框
-                            if demoManager.showNotificationBar && demoManager.demoState == .mainPage {
+                            if isWelcomeActive && demoManager.demoState == .mainPage {
                                 print("👋 关闭欢迎对话框")
                                 dismissWelcome()
                             } else if (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction || demoManager.demoState == .voiceCompleted) && demoManager.demoProfile.intimacyGrade < 3 {
@@ -126,10 +119,16 @@ struct DemoMainPetView: View {
             )
             .onAppear {
                 setupDemoState()
-                print("🎬 DemoMainPetView 出现 - 当前状态: \(demoManager.demoState.rawValue)")
+                // 初始化欢迎对话框状态
+                isWelcomeActive = demoManager.showNotificationBar
+                print("🎬 DemoMainPetView 出现 - 当前状态: \(demoManager.demoState.rawValue), 欢迎状态: \(isWelcomeActive)")
             }
             .onChange(of: demoManager.demoState) { newState in
                 handleStateChange(newState)
+            }
+            .onChange(of: demoManager.showNotificationBar) { newValue in
+                isWelcomeActive = newValue
+                print("🎬 欢迎对话框状态变化: \(newValue)")
             }
             .navigationDestination(isPresented: $showHealthDetection) {
                 DemoHealthDetectionView()
@@ -170,26 +169,40 @@ struct DemoMainPetView: View {
             // 使用GIF动画或静态图片
             if showInteractionAnimation {
                 // 点击交互动画
-                GIFAnimationView(gifName: "GIFs/mumu/touch/toutch-\(demoManager.demoProfile.intimacyGrade)")
+                GIFAnimationView(gifName: PetUtils.getMumuTouchGIFName(intimacyGrade: demoManager.demoProfile.intimacyGrade), isPlaying: true)
                     .frame(width: 150, height: 150)
                     .onAppear {
+                        print("🎬 开始播放touch GIF: \(PetUtils.getMumuTouchGIFName(intimacyGrade: demoManager.demoProfile.intimacyGrade))")
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                             showInteractionAnimation = false
+                            print("🎬 touch GIF播放结束")
                         }
                     }
             } else {
-                // 正常状态显示
-                Image("mumu")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 150, height: 150)
-                    .scaleEffect(1.0)
-                    .onTapGesture {
-                        if demoManager.demoState == .voiceInteraction && demoManager.demoProfile.intimacyGrade >= 3 {
-                            triggerInteractionAnimation()
-                        }
+                // 正常状态显示 - 使用idle GIF
+                Group {
+                    if demoManager.demoProfile.intimacyGrade >= 2 {
+                        // 2级和3级显示idle GIF
+                        GIFAnimationView(
+                            gifName: PetUtils.getMumuIdleGIFName(intimacyGrade: demoManager.demoProfile.intimacyGrade),
+                            isPlaying: true
+                        )
+                        .frame(width: 150, height: 150)
+                    } else {
+                        // 1级显示静态图片
+                        Image("mumu")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 150, height: 150)
+                            .scaleEffect(1.0)
                     }
-                    .allowsHitTesting(demoManager.demoState == .voiceInteraction)
+                }
+                .onTapGesture {
+                    if demoManager.demoState == .voiceInteraction && demoManager.demoProfile.intimacyGrade >= 3 {
+                        triggerInteractionAnimation()
+                    }
+                }
+                .allowsHitTesting(demoManager.demoState == .voiceInteraction)
             }
             
             // 亲密度显示（在进化动画时隐藏）
@@ -229,7 +242,7 @@ struct DemoMainPetView: View {
             
             // 进化GIF（淡入、播放、淡出阶段）
             if evolutionPhase == .gifFadeIn || evolutionPhase == .playing || evolutionPhase == .gifFadeOut {
-                GIFAnimationView(gifName: "GIFs/mumu/grow/2-3", isPlaying: evolutionPhase == .playing)
+                GIFAnimationView(gifName: "GIFs/mumu/grow/2-3", isPlaying: evolutionPhase == .gifFadeIn || evolutionPhase == .playing)
                     .frame(width: 200, height: 200)
                     .offset(y: -20) // 往上移动20点
                     .opacity(evolutionPhase == .gifFadeOut ? 0.0 : 1.0)
@@ -431,37 +444,37 @@ struct DemoMainPetView: View {
         showEvolutionAnimation = true
         evolutionPhase = .initial
         
-        // 1秒后开始淡出2级图片
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        // 0.5秒后开始淡出2级图片
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             evolutionPhase = .fadeOut
             print("🎬 2级图片开始淡出")
             
-            // 1秒后GIF淡入（暂停状态）
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            // 0.5秒后GIF淡入并立即播放
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 evolutionPhase = .gifFadeIn
-                print("🎬 GIF开始淡入（暂停状态）")
+                print("🎬 GIF开始淡入")
                 
-                // 2秒后开始播放GIF
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                // 立即开始播放GIF
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     evolutionPhase = .playing
                     print("🎬 开始播放进化GIF")
                     
-                    // 假设GIF播放时间为2秒，然后淡出
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    // 假设GIF播放时间为3秒，然后淡出
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         evolutionPhase = .gifFadeOut
                         print("🎬 GIF开始淡出")
                         
-                        // 1秒后显示3级UI
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        // 0.5秒后显示3级UI
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             evolutionPhase = .finalFadeIn
                             print("🎬 3级UI开始淡入")
                             
-                            // 1秒后结束动画
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            // 0.5秒后结束动画
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                 withAnimation(.easeInOut(duration: 0.5)) {
                                     showEvolutionAnimation = false
                                 }
-                                print("🎬 进化动画结束，按钮开始淡入")
+                                print("🎬 进化动画结束，恢复正常显示")
                             }
                         }
                     }
@@ -500,9 +513,11 @@ struct DemoMainPetView: View {
     private var welcomeOverlay: some View {
         GeometryReader { geometry in
             ZStack {
-                // 半透明背景
-                Color.black.opacity(0.3)
+                // 半透明背景 - 使用木属性主题背景色
+                PetUtils.getElementBackgroundColor(for: "木")
+                    .opacity(demoManager.showNotificationBar ? 0.9 : 0.0)
                     .ignoresSafeArea()
+                    .animation(.easeInOut(duration: 0.4), value: demoManager.showNotificationBar)
                     .onTapGesture {
                         dismissWelcome()
                     }
@@ -527,16 +542,16 @@ struct DemoMainPetView: View {
                     .frame(width: 130, height: 70, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.green.opacity(0.95))
+                            .fill(PetUtils.getElementDialogColor(for: "木").opacity(0.95))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.green, lineWidth: 1.5)
+                                    .stroke(PetUtils.getElementDialogColor(for: "木"), lineWidth: 1.5)
                             )
                     )
                     .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
                     .position(x: 80, y: 60)
-                    .scaleEffect(demoManager.showNotificationBar ? 1.0 : 0.8)
                     .opacity(demoManager.showNotificationBar ? 1.0 : 0.0)
+                    .animation(.easeInOut(duration: 0.5).delay(0.1), value: demoManager.showNotificationBar)
                     
                     // 宠物说话图片 - 右下角，部分超出屏幕边界
                     Image("mumu_speak")
@@ -544,16 +559,12 @@ struct DemoMainPetView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 160, height: 160)
                         .position(x: geometry.size.width - 40, y: geometry.size.height - 40)
-                        .scaleEffect(demoManager.showNotificationBar ? 1.0 : 0.8)
                         .opacity(demoManager.showNotificationBar ? 1.0 : 0.0)
+                        .animation(.easeInOut(duration: 0.5).delay(0.2), value: demoManager.showNotificationBar)
                 }
             }
         }
-        .transition(.asymmetric(
-            insertion: .opacity.combined(with: .scale),
-            removal: .opacity.combined(with: .scale)
-        ))
-        .animation(.easeInOut(duration: 0.8), value: demoManager.showNotificationBar)
+        .animation(.easeInOut(duration: 0.6), value: demoManager.showNotificationBar)
     }
     
     // MARK: - 上滑提示（已移除）
@@ -565,6 +576,7 @@ struct DemoMainPetView: View {
     private func dismissWelcome() {
         withAnimation(.easeInOut(duration: 0.3)) {
             demoManager.showNotificationBar = false
+            isWelcomeActive = false
         }
         print("👋 欢迎对话框已关闭")
     }

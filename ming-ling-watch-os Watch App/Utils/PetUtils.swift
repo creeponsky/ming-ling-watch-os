@@ -68,14 +68,32 @@ class PetUtils {
         let gifNumber: Int
         switch intimacyGrade {
         case 2:
-            gifNumber = 1 // 友好等级使用1.gif
+            gifNumber = 2 // 友好等级使用2-idle.gif
         case 3:
-            gifNumber = 2 // 亲密等级使用2.gif
+            gifNumber = 3 // 亲密等级使用3-idle.gif
         default:
-            gifNumber = 1 // 默认使用1.gif
+            gifNumber = 2 // 默认使用2-idle.gif
         }
         
         return "GIFs/mumu/idle/\(gifNumber)-idle"
+    }
+    
+    // MARK: - 获取mumu touch状态的GIF名称
+    static func getMumuTouchGIFName(intimacyGrade: Int) -> String {
+        // 根据亲密度等级选择touch GIF文件
+        let gifNumber: Int
+        switch intimacyGrade {
+        case 1:
+            gifNumber = 1
+        case 2:
+            gifNumber = 2
+        case 3:
+            gifNumber = 3
+        default:
+            gifNumber = 3 // 默认使用3级touch GIF
+        }
+        
+        return "GIFs/mumu/touch/touch-\(gifNumber)"
     }
     
     // MARK: - 获取宠物图片名称（根据亲密度）

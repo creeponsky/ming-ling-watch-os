@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Demo生日选择视图
 struct DemoBirthdaySelectionView: View {
     @StateObject private var demoManager = DemoManager.shared
-    @State private var selectedDate = Date()
+    @State private var selectedDate = Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date()
     @State private var selectedSex = 0 // 0男 1女
     @State private var isLoading = false
     
@@ -26,8 +26,8 @@ struct DemoBirthdaySelectionView: View {
             }
             .padding()
         }
-        .background(Color.green.opacity(0.1)) // 木属性主题
-        .navigationTitle("Demo设置")
+        .background(PetUtils.getElementBackgroundColor(for: "木")) // 木属性主题
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .opacity(1.0)
         .animation(.easeInOut(duration: 0.5), value: true)
@@ -50,46 +50,35 @@ struct DemoBirthdaySelectionView: View {
                 .font(.title2)
                 .fontWeight(.bold)
                 .foregroundColor(.green)
-            
-            Text("设置你的基本信息\n(Demo中将固定为木属性)")
-                .font(.caption)
-                .multilineTextAlignment(.center)
-                .foregroundColor(.green.opacity(0.7))
         }
     }
     
     // MARK: - 性别选择
     private var sexSelectionSection: some View {
         VStack(spacing: 12) {
-            Text("选择性别")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundColor(.green)
-            
             HStack(spacing: 20) {
                 // 男性选项
                 Button(action: {
                     selectedSex = 0
                 }) {
                     VStack(spacing: 8) {
-                        Image(systemName: "person.fill")
+                        Image(systemName: "mars.fill")
                             .font(.title)
-                            .foregroundColor(selectedSex == 0 ? .white : .green)
+                            .foregroundColor(selectedSex == 0 ? .white : .blue)
                         
                         Text("男")
                             .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundColor(selectedSex == 0 ? .white : .green)
+                            .foregroundColor(selectedSex == 0 ? .white : .blue)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 60)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(selectedSex == 0 ? Color.green : Color.green.opacity(0.2))
+                            .fill(selectedSex == 0 ? Color.blue : Color.blue.opacity(0.2))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.green, lineWidth: selectedSex == 0 ? 2 : 1)
+                                    .stroke(Color.blue, lineWidth: selectedSex == 0 ? 2 : 1)
                             )
                     )
                 }
@@ -100,23 +89,23 @@ struct DemoBirthdaySelectionView: View {
                     selectedSex = 1
                 }) {
                     VStack(spacing: 8) {
-                        Image(systemName: "person.fill")
+                        Image(systemName: "venus.fill")
                             .font(.title)
-                            .foregroundColor(selectedSex == 1 ? .white : .green)
+                            .foregroundColor(selectedSex == 1 ? .white : .pink)
                         
                         Text("女")
                             .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundColor(selectedSex == 1 ? .white : .green)
+                            .foregroundColor(selectedSex == 1 ? .white : .pink)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 60)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(selectedSex == 1 ? Color.green : Color.green.opacity(0.2))
+                            .fill(selectedSex == 1 ? Color.pink : Color.pink.opacity(0.2))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.green, lineWidth: selectedSex == 1 ? 2 : 1)
+                                    .stroke(Color.pink, lineWidth: selectedSex == 1 ? 2 : 1)
                             )
                     )
                 }

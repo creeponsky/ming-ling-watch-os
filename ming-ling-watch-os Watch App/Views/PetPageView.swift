@@ -8,16 +8,9 @@ struct PetPageView: View {
     
     var body: some View {
         ZStack {
-            // 背景渐变
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    PetUtils.getElementBackgroundColor(for: userElement).opacity(0.3),
-                    Color.black
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            // 背景纯色 - 使用元素主题背景色
+            PetUtils.getElementBackgroundColor(for: userElement)
+                .ignoresSafeArea()
             
             // 宠物图片和亲密值通知
             VStack {

@@ -7,7 +7,7 @@ struct HealthDashboardPageView: View {
     @StateObject private var healthKitManager = HealthKitManager.shared
     @StateObject private var environmentManager = EnvironmentSensorManager.shared
     @StateObject private var systemNotificationManager = SystemNotificationManager.shared
-    @StateObject private var gifAnimationManager = GIFAnimationManager.shared
+    @StateObject private var gifAnimationManager = GIFAnimationManager()
     @StateObject private var demoManager = DemoManager.shared
     
     @State private var isDelayedNotification: Bool = false
@@ -244,10 +244,6 @@ struct HealthDashboardPageView: View {
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金"))
-                            
-                            Text(demoManager.stateDescription)
-                                .font(.caption2)
-                                .foregroundColor(PetUtils.getElementTextColor(for: profileManager.userProfile.fiveElements?.primary ?? "金").opacity(0.7))
                         }
                         
                         Spacer()

@@ -24,16 +24,7 @@ struct DemoHealthDetectionView: View {
             }
             .padding()
         }
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.green.opacity(0.3),
-                    Color.black
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(PetUtils.getElementBackgroundColor(for: "木"))
 
         .navigationBarHidden(true)
         .onAppear {
@@ -59,7 +50,7 @@ struct DemoHealthDetectionView: View {
                     Text("返回")
                         .font(.caption)
                 }
-                .foregroundColor(.green)
+                .foregroundColor(PetUtils.getElementTextColor(for: "木"))
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -101,9 +92,6 @@ struct DemoHealthDetectionView: View {
                 // 久坐检测介绍
                 sedentaryDetectionIntro
             }
-            
-            // Demo状态信息
-            demoStatusInfo
         }
     }
     
@@ -117,21 +105,21 @@ struct DemoHealthDetectionView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "figure.walk")
                         .font(.system(size: 40))
-                        .foregroundColor(.green)
+                        .foregroundColor(PetUtils.getElementDialogColor(for: "木"))
                     
                     Text("久坐检测")
                         .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.green)
+                        .fontWeight(.bold)
+                        .foregroundColor(PetUtils.getElementTextColor(for: "木"))
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 120)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.green.opacity(0.1))
+                        .fill(PetUtils.getElementDialogColor(for: "木").opacity(0.1))
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.green, lineWidth: 3)
+                                .stroke(PetUtils.getElementDialogColor(for: "木"), lineWidth: 3)
                         )
                 )
                 
@@ -144,15 +132,15 @@ struct DemoHealthDetectionView: View {
                             Text(demoManager.demoState == .sedentaryTrigger ? "\(demoManager.sedentaryCountdown)s" : "\(demoManager.countdownSeconds)s")
                                 .font(.caption)
                                 .fontWeight(.bold)
-                                .foregroundColor(.green)
+                                .foregroundColor(PetUtils.getElementDialogColor(for: "木"))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.green.opacity(0.2))
+                                        .fill(PetUtils.getElementDialogColor(for: "木").opacity(0.2))
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .stroke(Color.green, lineWidth: 1)
+                                                .stroke(PetUtils.getElementDialogColor(for: "木"), lineWidth: 1)
                                         )
                                 )
                         }
@@ -172,12 +160,12 @@ struct DemoHealthDetectionView: View {
             // 步数圆圈
             ZStack {
                 Circle()
-                    .stroke(Color.green.opacity(0.3), lineWidth: 8)
+                    .stroke(PetUtils.getElementDialogColor(for: "木").opacity(0.3), lineWidth: 8)
                     .frame(width: 120, height: 120)
                 
                 Circle()
                     .trim(from: 0, to: min(1.0, Double(demoManager.demoProfile.stepCount) / 20.0))
-                    .stroke(Color.green, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .stroke(PetUtils.getElementDialogColor(for: "木"), style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .frame(width: 120, height: 120)
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut(duration: 0.5), value: demoManager.demoProfile.stepCount)
@@ -186,17 +174,17 @@ struct DemoHealthDetectionView: View {
                     Text("\(demoManager.demoProfile.stepCount)")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(.green)
+                        .foregroundColor(PetUtils.getElementTextColor(for: "木"))
                     
                     Text("步数")
                         .font(.caption)
-                        .foregroundColor(.green.opacity(0.7))
+                        .foregroundColor(PetUtils.getElementTextColor(for: "木").opacity(0.7))
                 }
             }
             
             Text("目标: 20步")
                 .font(.caption)
-                .foregroundColor(.green.opacity(0.7))
+                .foregroundColor(PetUtils.getElementTextColor(for: "木").opacity(0.7))
             
             if demoManager.demoProfile.stepCount >= 20 {
                 Text("🎉 目标完成！")
@@ -211,26 +199,7 @@ struct DemoHealthDetectionView: View {
     
     // MARK: - Demo状态信息
     private var demoStatusInfo: some View {
-        VStack(spacing: 8) {
-            Text("当前Demo阶段")
-                .font(.caption2)
-                .foregroundColor(.green.opacity(0.7))
-            
-            Text(demoManager.stateDescription)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.green)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.green.opacity(0.1))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                        )
-                )
-        }
+        EmptyView()
     }
     
         // MARK: - 底部按钮区域

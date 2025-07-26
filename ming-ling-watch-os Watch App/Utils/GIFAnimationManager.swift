@@ -4,8 +4,6 @@ import ImageIO
 
 // MARK: - GIF动画管理器
 class GIFAnimationManager: ObservableObject {
-    static let shared = GIFAnimationManager()
-    
     @Published var isPlaying: Bool = false
     @Published var currentImage: UIImage?
     @Published var currentGIFIndex: Int = 0
@@ -16,7 +14,7 @@ class GIFAnimationManager: ObservableObject {
     private var currentFrameIndex: Int = 0
     private var totalFrames: Int = 0
     
-    private init() {}
+    init() {}
     
     // MARK: - 加载GIF动画
     func loadGIF(named gifName: String) {
