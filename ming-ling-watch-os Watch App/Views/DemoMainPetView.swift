@@ -2,13 +2,17 @@ import SwiftUI
 import WatchKit
 
 // MARK: - 进化阶段枚举
+// 细分进化动画阶段
 enum EvolutionPhase {
-    case initial      // 初始状态
-    case fadeOut      // 2级图片淡出
-    case gifFadeIn    // GIF淡入（暂停）
-    case playing      // GIF播放
-    case gifFadeOut   // GIF淡出
-    case finalFadeIn  // 3级UI淡入
+    case initial            // 初始状态（2级宠物和2级亲密度显示）
+    case fadeOut2nd         // 2级宠物淡出
+    case waitAfterFadeOut   // 2级宠物淡出后等待
+    case growGifFadeIn      // grow gif淡入（暂停）
+    case growGifPaused      // grow gif暂停2s
+    case growGifPlaying     // grow gif播放一次
+    case growGifPauseAfterPlay // grow gif播放后暂停3s
+    case growGifFadeOut     // grow gif淡出
+    case finalFadeIn3rd     // 3级宠物和亲密度淡入
 }
 
 // MARK: - 录音状态枚举
@@ -59,14 +63,18 @@ struct DemoMainPetView: View {
                         }
 
                         Spacer()
-
-                        // 底部控制区域
-                        bottomControlArea
                     }
                     .offset(x: (demoManager.demoProfile.intimacyGrade < 3 &&
                                (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction)) ? swipeOffset : 0)
                     .opacity((demoManager.demoProfile.intimacyGrade < 3 &&
                              (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction)) ? max(0.0, 1.0 - abs(swipeOffset) / 200.0) : 1.0)
+
+                    // 底部控制区域 - 直接放在ZStack中，确保在屏幕内
+                    bottomControlArea
+                        .offset(x: (demoManager.demoProfile.intimacyGrade < 3 &&
+                                   (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction)) ? swipeOffset : 0)
+                        .opacity((demoManager.demoProfile.intimacyGrade < 3 &&
+                                 (demoManager.demoState == .mainPage || demoManager.demoState == .sedentaryTrigger || demoManager.demoState == .stepDetection || demoManager.demoState == .voiceInteraction)) ? max(0.0, 1.0 - abs(swipeOffset) / 200.0) : 1.0)
 
                     // 健康检测页面预览（左滑时显示）
                     if isSwipeActive && swipeOffset < -50 && demoManager.demoProfile.intimacyGrade < 3 &&
@@ -295,8 +303,8 @@ struct DemoMainPetView: View {
     // MARK: - 进化动画视图
     private var evolutionAnimationView: some View {
         ZStack {
-            // 2级宠物图片（淡出阶段）
-            if evolutionPhase == .initial || evolutionPhase == .fadeOut {
+            // 2级宠物图片（初始和淡出阶段）
+            if evolutionPhase == .initial || evolutionPhase == .fadeOut2nd {
                 VStack {
                     Image("mumu")
                         .resizable()
@@ -304,8 +312,6 @@ struct DemoMainPetView: View {
                         .frame(width: 150, height: 150)
                         .opacity(evolutionPhase == .initial ? 1.0 : 0.0)
                         .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
-
-                    // 2级亲密度显示
                     HStack {
                         ForEach(1...3, id: \.self) { level in
                             Image(systemName: level <= 2 ? "heart.fill" : "heart")
@@ -317,27 +323,26 @@ struct DemoMainPetView: View {
                     .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
                 }
             }
-
-            // 进化GIF（淡入、播放、淡出阶段）
-            if evolutionPhase == .gifFadeIn || evolutionPhase == .playing || evolutionPhase == .gifFadeOut {
-                GIFAnimationView(gifName: "GIFs/mumu/grow/2-3", isPlaying: evolutionPhase == .gifFadeIn || evolutionPhase == .playing)
-                    .frame(width: 200, height: 200)
-                    .offset(y: -20) // 往上移动20点
-                    .opacity(evolutionPhase == .gifFadeOut ? 0.0 : 1.0)
-                    .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
+            // grow gif（淡入、暂停、播放、暂停、淡出阶段）
+            if evolutionPhase == .growGifFadeIn || evolutionPhase == .growGifPaused || evolutionPhase == .growGifPlaying || evolutionPhase == .growGifPauseAfterPlay || evolutionPhase == .growGifFadeOut {
+                GIFAnimationView(
+                    gifName: "GIFs/mumu/grow/2-3",
+                    isPlaying: evolutionPhase == .growGifPlaying
+                )
+                .frame(width: 200, height: 200)
+                .offset(y: -20)
+                .opacity(evolutionPhase == .growGifFadeOut ? 0.0 : 1.0)
+                .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
             }
-
             // 3级宠物图片（最终淡入阶段）
-            if evolutionPhase == .finalFadeIn {
+            if evolutionPhase == .finalFadeIn3rd {
                 VStack {
                     Image("mumu")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 150, height: 150)
                         .opacity(1.0)
-                        .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
-
-                    // 3级亲密度显示
+                        .animation(.easeInOut(duration: 1.2), value: evolutionPhase)
                     HStack {
                         ForEach(1...3, id: \.self) { level in
                             Image(systemName: level <= 3 ? "heart.fill" : "heart")
@@ -346,7 +351,7 @@ struct DemoMainPetView: View {
                         }
                     }
                     .opacity(1.0)
-                    .animation(.easeInOut(duration: 1.0), value: evolutionPhase)
+                    .animation(.easeInOut(duration: 1.2), value: evolutionPhase)
                 }
             }
         }
@@ -380,42 +385,57 @@ struct DemoMainPetView: View {
 
     // MARK: - 底部控制区域
     private var bottomControlArea: some View {
-        HStack {
-            // 语音录音按钮 - 左下角
+        ZStack {
+            // 语音录音按钮 - 左下角，但在安全区域内
             if demoManager.demoState == .voiceInteraction && !showEvolutionAnimation {
-                voiceRecordingButton
-                    .opacity(1.0)
-                    .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
-                    .allowsHitTesting(true)
+                VStack {
+                    Spacer()
+                    HStack {
+                        voiceRecordingButton
+                            .opacity(1.0)
+                            .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
+                            .allowsHitTesting(true)
+                        
+                        Spacer()
+                    }
+                    .padding(.leading, 10)
+                    .padding(.bottom, 10)
+                }
             }
 
-            Spacer()
-
-            // 退出按钮 - 右下角
+            // 退出按钮 - 右下角，但在安全区域内
             if demoManager.canExitDemo && !showEvolutionAnimation {
-                Button(action: {
-                    demoManager.exitDemo()
-                }) {
-                    Text("退出")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.black.opacity(0.5))
-                                .overlay(
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        
+                        Button(action: {
+                            demoManager.exitDemo()
+                        }) {
+                            Text("退出")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.red.opacity(0.5), lineWidth: 1)
+                                        .fill(Color.black.opacity(0.5))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color.red.opacity(0.5), lineWidth: 1)
+                                        )
                                 )
-                        )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .opacity(1.0)
+                        .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
+                    }
+                    .padding(.trailing, 10)
+                    .padding(.bottom, 10)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .opacity(1.0)
-                .animation(.easeInOut(duration: 0.5), value: showEvolutionAnimation)
             }
         }
-        .padding(.horizontal)
     }
 
     // MARK: - 语音录音按钮
@@ -704,38 +724,47 @@ struct DemoMainPetView: View {
         print("🎬 开始进化动画流程")
         showEvolutionAnimation = true
         evolutionPhase = .initial
-        
-        // 立即开始淡出2级图片
+        // 1. 2级宠物淡出
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            evolutionPhase = .fadeOut
-            print("🎬 2级图片开始淡出")
-            
-            // 0.5秒后GIF淡入
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                evolutionPhase = .gifFadeIn
-                print("🎬 GIF开始淡入")
-                
-                // 暂停2秒后再开始播放
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    evolutionPhase = .playing
-                    print("🎬 开始播放进化GIF")
-                    
-                    // 假设GIF播放时间为3秒，然后暂停3秒
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                        evolutionPhase = .gifFadeOut
-                        print("🎬 GIF播放完成，开始淡出")
-                        
-                        // 0.5秒后显示3级UI和其他图标
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            evolutionPhase = .finalFadeIn
-                            print("🎬 3级UI和其他图标开始淡入")
-                            
-                            // 0.5秒后结束动画
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    showEvolutionAnimation = false
+            evolutionPhase = .fadeOut2nd
+            print("🎬 2级宠物开始淡出")
+            // 2. 淡出后等待1.5s
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                evolutionPhase = .waitAfterFadeOut
+                print("🎬 2级宠物淡出后等待1.5s")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    // 3. grow gif淡入（暂停）
+                    evolutionPhase = .growGifFadeIn
+                    print("🎬 grow gif淡入（暂停）")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        // 4. grow gif暂停2s
+                        evolutionPhase = .growGifPaused
+                        print("🎬 grow gif暂停2s")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            // 5. grow gif播放一次
+                            evolutionPhase = .growGifPlaying
+                            print("🎬 grow gif开始播放一次")
+                            // 假设gif播放时间为3s
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                // 6. grow gif播放后暂停3s
+                                evolutionPhase = .growGifPauseAfterPlay
+                                print("🎬 grow gif播放后暂停3s")
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                    // 7. grow gif淡出
+                                    evolutionPhase = .growGifFadeOut
+                                    print("🎬 grow gif淡出")
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                        // 8. 3级宠物和亲密度淡入
+                                        evolutionPhase = .finalFadeIn3rd
+                                        print("🎬 3级宠物和亲密度淡入")
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                            withAnimation(.easeInOut(duration: 0.5)) {
+                                                showEvolutionAnimation = false
+                                            }
+                                            print("🎬 进化动画结束，恢复正常显示")
+                                        }
+                                    }
                                 }
-                                print("🎬 进化动画结束，恢复正常显示")
                             }
                         }
                     }
