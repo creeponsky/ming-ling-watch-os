@@ -151,7 +151,21 @@ struct PetNotificationLongLookView: View {
     
     // MARK: - 获取亲密度图标
     private func getIntimacyIcon() -> String {
-        let intimacyGrade = profileManager.userProfile.intimacyGrade
+        // 检查是否在Demo模式
+        let intimacyGrade: Int
+        if DemoManager.shared.isDemo {
+            // Demo模式：使用DemoManager的亲密度，但考虑显示限制
+            let realGrade = DemoManager.shared.demoProfile.intimacyGrade
+            if realGrade >= 3 && !DemoManager.shared.canShowLevel3Gif {
+                intimacyGrade = 2 // 如果不能显示3级gif，图标也使用2级
+            } else {
+                intimacyGrade = realGrade
+            }
+        } else {
+            // 正常模式：使用UserProfileManager的亲密度
+            intimacyGrade = profileManager.userProfile.intimacyGrade
+        }
+        
         switch intimacyGrade {
         case 1:
             return "heart"
@@ -176,8 +190,28 @@ struct PetNotificationLongLookView: View {
     
     // MARK: - 获取GIF名称
     private func getGIFName() -> String {
-        let intimacyGrade = profileManager.userProfile.intimacyGrade
-        return PetUtils.getPetGIFName(for: userElement, intimacyGrade: intimacyGrade)
+        // 检查是否在Demo模式
+        if DemoManager.shared.isDemo {
+            // Demo模式：使用DemoManager的亲密度和限制
+            let intimacyGrade = DemoManager.shared.demoProfile.intimacyGrade
+            
+            // 如果亲密度为3级但还不能显示3级gif（grow动画未播放完成），使用2级
+            let effectiveGrade: Int
+            if intimacyGrade >= 3 && !DemoManager.shared.canShowLevel3Gif {
+                effectiveGrade = 2
+                print("🎬 通知系统(Demo): 亲密度3级但未允许显示3级gif，使用2级 (intimacyGrade: \(intimacyGrade), canShowLevel3Gif: \(DemoManager.shared.canShowLevel3Gif))")
+            } else {
+                effectiveGrade = intimacyGrade
+                print("🎬 通知系统(Demo): 使用等级 \(effectiveGrade) (intimacyGrade: \(intimacyGrade), canShowLevel3Gif: \(DemoManager.shared.canShowLevel3Gif))")
+            }
+            
+            return PetUtils.getPetGIFName(for: userElement, intimacyGrade: effectiveGrade)
+        } else {
+            // 正常模式：使用UserProfileManager的亲密度
+            let intimacyGrade = profileManager.userProfile.intimacyGrade
+            print("🎬 通知系统(正常): 使用等级 \(intimacyGrade)")
+            return PetUtils.getPetGIFName(for: userElement, intimacyGrade: intimacyGrade)
+        }
     }
     
     // MARK: - 获取通知消息

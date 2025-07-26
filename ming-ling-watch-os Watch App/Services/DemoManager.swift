@@ -120,8 +120,14 @@ class DemoManager: ObservableObject {
         demoProfile = DemoUserProfile()
         showNotificationBar = false
         hasShownWelcome = false
+        shouldPlayEvolutionAnimation = false
+        
+        // 重置grow动画相关状态
+        hasPlayedGrowAnimation = false
+        canShowLevel3Gif = false
+        
         saveDemoData()
-        print("🎬 Demo开始: 进入生日选择阶段")
+        print("🎬 Demo开始: 进入生日选择阶段，grow动画状态已重置")
     }
     
     // MARK: - 退出Demo
@@ -240,11 +246,14 @@ class DemoManager: ObservableObject {
         demoProfile.addIntimacy(30) // 升级到3级
         demoProfile.completeDemo() // 标记Demo完成
         
+        // 确保在grow动画播放完成前不显示3级gif
+        canShowLevel3Gif = false
+        
         // 直接进入语音交互阶段，标记需要播放进化动画
         demoState = .voiceInteraction
         shouldPlayEvolutionAnimation = true // 标记需要播放进化动画
         saveDemoData()
-        print("🎬 Demo: 步数目标完成，直接进入语音交互阶段，准备播放进化动画")
+        print("🎬 Demo: 步数目标完成，直接进入语音交互阶段，准备播放进化动画，暂时禁止3级gif显示")
         
         // 发送完成通知
         sendCompletionNotification()
@@ -348,38 +357,54 @@ class DemoManager: ObservableObject {
                 print("⚠️ [步数处理] 检测到负数增量: \(stepIncrease)")
                 print("📊 [数据源分析] 可能原因：数据源不一致或步数计算器重置")
                 
-                // 如果这是前几次检查，重新设置初始步数
-                if self.stepCheckCount <= 5 {
-                    self.initialStepCount = currentTotalSteps
-                    self.demoProfile.stepCount = 0
-                    print("🔧 [步数处理] 重新校准初始步数: \(self.initialStepCount)，从0开始计算")
-                    self.objectWillChange.send()
-                    return
-                } else {
-                    // 如果已经检查多次还是负数，可能是数据异常，忽略此次更新
-                    print("❌ [步数处理] 多次检查均为负数，忽略此次更新")
-                    return
-                }
-            }
-            
-            // 第一次检查时，如果增量过大（超过30步），重新设置初始步数
-            if self.stepCheckCount == 1 && stepIncrease > 30 {
-                print("⚠️ [步数处理] 第一次检查增量过大(\(stepIncrease))，重新设置初始步数为当前步数")
+                // 重新设置初始步数为当前值
                 self.initialStepCount = currentTotalSteps
                 self.demoProfile.stepCount = 0
-                print("🔧 [步数处理] 重新设置初始步数: \(self.initialStepCount)，从0开始计算")
+                print("🔧 [步数处理] 重新校准初始步数: \(self.initialStepCount)，从0开始计算")
                 self.objectWillChange.send()
                 return
             }
             
-            // 如果增量异常过大（超过200步），可能是数据异常，忽略
-            if stepIncrease > 200 {
-                print("❌ [步数处理] 步数增量异常过大: \(stepIncrease)，忽略此次更新")
+            // 容错处理：检测异常大的步数增量并分级处理
+            let lastStepCount = self.demoProfile.stepCount
+            let singleUpdateIncrease = stepIncrease - lastStepCount
+            
+            var newStepCount: Int
+            
+            // 分级处理不同范围的步数增量
+            if singleUpdateIncrease <= 10 {
+                // 10步以内：正常计算
+                newStepCount = stepIncrease
+                print("✅ [容错处理] 正常增量(\(singleUpdateIncrease)步)，直接计算: \(lastStepCount) -> \(newStepCount)")
+            } else if singleUpdateIncrease <= 20 {
+                // 10-20步：按5步计算
+                newStepCount = lastStepCount + 5
+                print("⚠️ [容错处理] 中等增量(\(singleUpdateIncrease)步)，按5步计算: \(lastStepCount) -> \(newStepCount)")
+                // 调整初始步数以保持一致性
+                self.initialStepCount = currentTotalSteps - newStepCount
+                print("🔧 [容错处理] 调整初始步数为: \(self.initialStepCount)")
+            } else {
+                // 大于20步：不统计，保持原有步数
+                newStepCount = lastStepCount
+                print("❌ [容错处理] 大幅增量(\(singleUpdateIncrease)步)，不统计，保持步数: \(newStepCount)")
+                // 调整初始步数，忽略这次的异常增量
+                self.initialStepCount = currentTotalSteps - lastStepCount
+                print("🔧 [容错处理] 调整初始步数为: \(self.initialStepCount)")
+            }
+            
+            // 如果总增量异常过大（超过100步），直接重置
+            if stepIncrease > 100 {
+                print("❌ [容错处理] 总增量异常过大(\(stepIncrease)步)，完全重置基准")
+                self.initialStepCount = currentTotalSteps
+                self.demoProfile.stepCount = 0
+                newStepCount = 0
+                print("🔧 [容错处理] 完全重置 - 新初始步数: \(self.initialStepCount)")
+                self.objectWillChange.send()
                 return
             }
             
-            // 更新步数增量
-            let newStepCount = stepIncrease
+            // 确保步数为正数且合理
+            newStepCount = max(0, newStepCount)
             if newStepCount != self.demoProfile.stepCount {
                 self.demoProfile.stepCount = newStepCount
                 print("✅ [步数处理] 步数更新成功 - 新增量: \(newStepCount)")
@@ -657,6 +682,13 @@ class DemoManager: ObservableObject {
             canShowLevel3Gif = demoData.canShowLevel3Gif
             
             print("🎬 Demo数据已加载: 状态=\(demoState.rawValue), hasShownWelcome=\(hasShownWelcome), shouldPlayEvolutionAnimation=\(shouldPlayEvolutionAnimation), countdownSeconds=\(countdownSeconds), isStepMonitoringActive=\(isStepMonitoringActive), sedentaryCountdown=\(sedentaryCountdown), stepGoalCompleted=\(demoProfile.stepGoalCompleted), hasCompletedDemo=\(demoProfile.hasCompletedDemo), hasPlayedGrowAnimation=\(hasPlayedGrowAnimation), canShowLevel3Gif=\(canShowLevel3Gif)")
+            
+            // 数据一致性检查：如果亲密度3级但步数目标完成且还没播放过grow动画，确保不能显示3级gif
+            if demoProfile.intimacyGrade >= 3 && demoProfile.stepGoalCompleted && !hasPlayedGrowAnimation {
+                canShowLevel3Gif = false
+                shouldPlayEvolutionAnimation = true
+                print("🎬 数据一致性修复: 亲密度3级但未播放grow动画，重置显示权限")
+            }
         }
     }
     
@@ -700,7 +732,8 @@ class DemoManager: ObservableObject {
             print("🎬 安排播放grow动画")
             shouldPlayEvolutionAnimation = true
             hasPlayedGrowAnimation = true
-            // 注意：这里不设置canShowLevel3Gif，等动画播放完成后再设置
+            canShowLevel3Gif = false // 确保在动画播放完成前不显示3级gif
+            print("🎬 暂时禁止3级gif显示，等动画播放完成后再设置")
         }
         
         // 回到主页面

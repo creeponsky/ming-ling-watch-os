@@ -26,6 +26,8 @@ struct DemoMainPetView: View {
     @State private var shouldShowMainContent = false // 新增：控制主内容首次显示
     // 新增：控制grow动画前的显示状态
     @State private var isWaitingForGrowAnimation = false
+    @State private var isPageActive = false // 新增：页面是否处于活跃状态
+    @Environment(\.scenePhase) private var scenePhase // 新增：场景状态
 
     var body: some View {
         GeometryReader { geometry in
@@ -244,6 +246,9 @@ struct DemoMainPetView: View {
                     }
             )
                     .onAppear {
+            // 设置页面为活跃状态
+            isPageActive = true
+            
             setupDemoState()
             // 重新计算倒计时，确保后台状态恢复正常
             demoManager.recalculateCountdown()
@@ -260,6 +265,14 @@ struct DemoMainPetView: View {
                 shouldShowMainContent = true
             }
             print("🎬 DemoMainPetView 出现 - 当前状态: \(demoManager.demoState.rawValue), 欢迎状态: \(isWelcomeActive), 主内容显示: \(shouldShowMainContent), showNotificationBar: \(demoManager.showNotificationBar)")
+            
+            // 检查是否需要显示grow动画（仅在页面活跃时）
+            checkForGrowAnimation()
+        }
+        .onDisappear {
+            // 设置页面为非活跃状态
+            isPageActive = false
+            print("🎬 DemoMainPetView onDisappear - 页面离开")
         }
             .onChange(of: demoManager.demoState) { newState in
                 handleStateChange(newState)
@@ -357,7 +370,24 @@ struct DemoMainPetView: View {
                     }
                 }
             }
-        .navigationBarHidden(true)
+                    .navigationBarHidden(true)
+            .onChange(of: scenePhase) { phase in
+                handleScenePhaseChange(phase)
+            }
+            .onChange(of: demoManager.demoProfile.stepGoalCompleted) { completed in
+                // 监听步数目标完成状态变化，仅在页面活跃时触发grow动画
+                if completed && isPageActive {
+                    print("🎬 步数目标完成且页面活跃，检查grow动画")
+                    checkForGrowAnimation()
+                }
+            }
+            .onChange(of: demoManager.shouldPlayEvolutionAnimation) { shouldPlay in
+                // 监听进化动画标记变化，仅在页面活跃时触发
+                if shouldPlay && isPageActive {
+                    print("🎬 进化动画标记激活且页面活跃，检查grow动画")
+                    checkForGrowAnimation()
+                }
+            }
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -377,20 +407,6 @@ struct DemoMainPetView: View {
             }
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
     
     // MARK: - 开始语音录音
     private func startVoiceRecording() {
@@ -431,19 +447,14 @@ struct DemoMainPetView: View {
 
     // MARK: - 设置Demo状态
     private func setupDemoState() {
-        // 检查是否需要播放进化动画
-        if demoManager.shouldPlayEvolutionAnimation && demoManager.demoProfile.intimacyGrade >= 3 {
-            print("🎬 检测到需要播放进化动画")
-            startEvolutionAnimation()
-            demoManager.shouldPlayEvolutionAnimation = false
-            demoManager.saveDemoData()
-        }
-
         // 标记已显示欢迎对话框（由setBirthday方法控制显示时机）
         if demoManager.demoState == .mainPage && !demoManager.hasShownWelcome {
             demoManager.hasShownWelcome = true
             demoManager.saveDemoData() // 保存状态
         }
+        
+        // 注意：进化动画的检查和触发移到了checkForGrowAnimation()方法中
+        // 这样避免在setupDemoState中重复处理动画逻辑
     }
 
     // MARK: - 处理状态变化
@@ -457,12 +468,8 @@ struct DemoMainPetView: View {
                 shouldShowMainContent = true
             }
             
-            // 如果标记需要播放进化动画，启动动画
-            if demoManager.shouldPlayEvolutionAnimation {
-                print("🎬 语音交互状态检测到需要播放grow动画")
-                isWaitingForGrowAnimation = true
-                startEvolutionAnimation()
-            }
+            // 检查是否需要播放grow动画
+            checkForGrowAnimation()
         case .mainPage:
             // 如果回到主页面，检查是否需要显示欢迎对话框
             if demoManager.showNotificationBar {
@@ -476,11 +483,7 @@ struct DemoMainPetView: View {
             }
             
             // 检查是否需要播放grow动画
-            if demoManager.shouldPlayEvolutionAnimation && demoManager.demoProfile.intimacyGrade >= 3 {
-                print("🎬 主页面状态检测到需要播放grow动画")
-                isWaitingForGrowAnimation = true
-                startEvolutionAnimation()
-            }
+            checkForGrowAnimation()
         case .sedentaryTrigger, .stepDetection:
             // 久坐检测和步数检测状态，确保主内容显示
             if !isWelcomeActive {
@@ -499,9 +502,17 @@ struct DemoMainPetView: View {
     private func startEvolutionAnimation() {
         print("🎬 开始进化动画流程")
         
+        // 检查页面是否活跃
+        guard isPageActive else {
+            print("⚠️ 页面不活跃，延迟播放grow动画")
+            isWaitingForGrowAnimation = false
+            return
+        }
+        
         // 确保只播放一次
         guard demoManager.shouldPlayEvolutionAnimation else {
             print("⚠️ 不需要播放进化动画")
+            isWaitingForGrowAnimation = false
             return
         }
         
@@ -594,6 +605,51 @@ struct DemoMainPetView: View {
             showInteractionAnimation = false
             print("👆 touch动画结束")
         }
+    }
+    
+    // MARK: - 处理场景状态变化
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            isPageActive = true
+            print("🎬 App变为活跃状态")
+            // 当app变为活跃时，检查是否需要播放grow动画
+            // 这对于通过通知进入app的情况特别重要
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.checkForGrowAnimation()
+            }
+        case .inactive, .background:
+            isPageActive = false
+            print("🎬 App变为非活跃状态")
+        @unknown default:
+            break
+        }
+    }
+    
+    // MARK: - 检查grow动画
+    private func checkForGrowAnimation() {
+        print("🎬 检查grow动画条件 - 页面活跃: \(isPageActive), 步数目标完成: \(demoManager.demoProfile.stepGoalCompleted), 已播放动画: \(demoManager.hasPlayedGrowAnimation), 应播放动画: \(demoManager.shouldPlayEvolutionAnimation)")
+        
+        // 只有在页面活跃、步数目标完成、还未播放过grow动画且标记需要播放时才触发
+        guard isPageActive && 
+              demoManager.demoProfile.stepGoalCompleted && 
+              !demoManager.hasPlayedGrowAnimation &&
+              demoManager.shouldPlayEvolutionAnimation else {
+            print("🎬 不满足grow动画触发条件")
+            return
+        }
+        
+        print("🎬 满足grow动画触发条件，准备播放")
+        
+        // 检查是否已经在等待动画
+        guard !isWaitingForGrowAnimation else {
+            print("🎬 已在等待grow动画，跳过")
+            return
+        }
+        
+        // 触发grow动画
+        isWaitingForGrowAnimation = true
+        startEvolutionAnimation()
     }
 
 

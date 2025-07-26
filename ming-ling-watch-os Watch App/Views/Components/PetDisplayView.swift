@@ -10,11 +10,19 @@ struct PetDisplayView: View {
     var body: some View {
         // 获取当前应该显示的等级
         let displayGrade: Int = {
+            // 如果亲密度已达到3级，但还不能显示3级gif（grow动画未播放完成），强制显示2级
             if demoManager.demoProfile.intimacyGrade >= 3 && !demoManager.canShowLevel3Gif {
-                // 如果亲密度已达到3级但还不能显示3级gif，显示2级
+                print("🎬 PetDisplayView: 亲密度3级但未允许显示3级gif，显示2级")
                 return 2
-            } else {
+            } 
+            // 如果正在等待播放grow动画，也显示2级
+            else if demoManager.shouldPlayEvolutionAnimation && demoManager.demoProfile.intimacyGrade >= 3 {
+                print("🎬 PetDisplayView: 等待播放grow动画，显示2级")
+                return 2
+            } 
+            else {
                 // 否则显示当前亲密度等级
+                print("🎬 PetDisplayView: 显示等级 \(demoManager.demoProfile.intimacyGrade)")
                 return demoManager.demoProfile.intimacyGrade
             }
         }()
